@@ -8,12 +8,12 @@ open import FFI.Data.Either using (Either; Left; Right; mapL; mapR; mapLR; swapL
 open import FFI.Data.Maybe using (Maybe; just; nothing)
 open import Luau.Heap using (Heap; Object; function_is_end; defn; alloc; ok; next; lookup-not-allocated) renaming (_≡_⊕_↦_ to _≡ᴴ_⊕_↦_; _[_] to _[_]ᴴ; ∅ to ∅ᴴ)
 open import Luau.ResolveOverloads using (Resolved; src; resolve; resolveⁿ; resolveᶠ; resolveˢ; resolveToˢ; srcⁿ; target; yes; no)
-open import Luau.SafeTypes using (Unsafe; param; result)
+open import Luau.SafeTypes using (Unsafe; param; result; ∩-right)
 open import Luau.ErrorSuppression using (_,_)
 open import Luau.StrictMode using (Warningᴱ; Warningᴮ; Warningᴼ; Warningᴴ; UnallocatedAddress; UnboundVariable; FunctionCallMismatch; NotFunctionCall; app₁; app₂; BinOpMismatch₁; BinOpMismatch₂; bin₁; bin₂; BlockMismatch; block₁; return; LocalVarMismatch; local₁; local₂; FunctionDefnMismatch; function₁; function₂; heap; expr; block; addr; UnsafeBlock; UnsafeLocal; UnsafeFunction)
 open import Luau.Substitution using (_[_/_]ᴮ; _[_/_]ᴱ; _[_/_]ᴮunless_; var_[_/_]ᴱwhenever_)
 open import Luau.Subtyping using (_<:_; _≮:_; witness; any; never; scalar; scalar-function; scalar-scalar; function-scalar; function-ok; left; right; _,_; error; Language; ¬Language)
-open import Luau.Syntax using (Expr; yes; var; val; var_∈_; _⟨_⟩∈_; _$_; addr; num; bool; str; binexp; nil; function_is_end; block_is_end; done; return; local_←_; _∙_; fun; arg; name; ==; ~=; +; -; *; /; <; >; <=; >=; ··)
+open import Luau.Syntax using (Expr; yes; var; val; var_∈_; _⟨_∌_⟩∈_; _$_; addr; num; bool; str; binexp; nil; function_is_end; block_is_end; done; return; local_←_; _∙_; fun; arg; name; ==; ~=; +; -; *; /; <; >; <=; >=; ··)
 open import Luau.Type using (Type; NIL; NUMBER; STRING; BOOLEAN; nill; number; string; boolean; scalar; error; unknown; funktion; _⇒_; never; any; _∩_; _∪_; _≡ᵀ_; _≡ᴹᵀ_; _≡ˢ_)
 open import Luau.TypeCheck using (_⊢ᴮ_∈_; _⊢ᴱ_∈_; _⊢ᴴᴮ_▷_∈_; _⊢ᴴᴱ_▷_∈_; nil; var; addr; app; function; block; done; return; local; orAny; srcBinOp; tgtBinOp)
 open import Luau.SafeTypes using (Unsafe)
@@ -35,7 +35,7 @@ open import Properties.Subtyping using (any-≮:; ≡-trans-≮:; ≮:-trans-≡
 open import Properties.ResolveOverloads using (src-any-≮:; any-src-≮:; <:-src; <:-srcᶠ; <:-resolve; resolve-<:-⇒; <:-resolve-⇒)
 open import Properties.Subtyping using (any-≮:; ≡-trans-≮:; ≮:-trans-≡; ≮:-trans; <:-trans-≮:; ≮:-refl; scalar-≢-impl-≮:; function-≮:-scalar; scalar-≮:-function; function-≮:-never; any-≮:-scalar; scalar-≮:-never; any-≮:-never; ≡-impl-<:; ≡-trans-<:; <:-trans-≡; ≮:-trans-<:; <:-trans; dec-language)
 open import Properties.TypeCheck using (typeOfᴼ; typeOfᴹᴼ; typeOfⱽ; typeOfᴱ; typeOfᴮ; typeCheckᴱ; typeCheckᴮ; typeCheckᴼ; typeCheckᴴ)
-open import Properties.TypeNormalization using (normal; Normal; FunType; ErrScalar; OptScalar; _⇒_; _∩_; _∪_; never; error; scalar; normalize-<:; normal-∩ⁿ; normal-∩ⁿˢ)
+open import Properties.TypeNormalization using (normal; Normal; FunType; ErrScalar; OptScalar; _⇒_; _∩_; _∪_; never; error; scalar; normalize-<:; normal-∩ⁿ; normal-∩ⁿˢ; fun-≮:-scalar; fun-≮:-never)
 open import Properties.TypeSaturation using (Overloads; Saturated; _⊆ᵒ_; _<:ᵒ_; normal-saturate; normal-∩-saturate; normal-∪-saturate; saturated; <:-saturate; saturate-<:; defn; here; left; right)
 open import Luau.OpSem using (_⟦_⟧_⟶_; _⊢_⟶*_⊣_; _⊢_⟶ᴮ_⊣_; _⊢_⟶ᴱ_⊣_; app₁; app₂; function; beta; return; block; done; local; subst; binOp₀; binOp₁; binOp₂; refl; step; +; -; *; /; <; >; ==; ~=; <=; >=; ··)
 open import Luau.RuntimeError using (BinOpError; RuntimeErrorᴱ; RuntimeErrorᴮ; FunctionMismatch; BinOpMismatch₁; BinOpMismatch₂; UnboundVariable; SEGV; app₁; app₂; bin₁; bin₂; block; local; return; +; -; *; /; <; >; <=; >=; ··)
@@ -119,34 +119,34 @@ Unsafe-impl-Warningᴱ : ∀ H Γ M → Unsafe (typeOfᴱ H Γ M) → (Warning�
 Unsafe-impl-Warningᴮ : ∀ H Γ B → Unsafe (typeOfᴮ H Γ B) → (Warningᴮ+ H Γ B)
 NotFunctionCallᴱ+ : ∀ {H Γ M N} → (typeOfᴱ H Γ M ≮: funktion) → Warningᴱ+ H Γ (M $ N)
 FunctionCallMismatchᴱ+ : ∀ {H Γ M N} → (typeOfᴱ H Γ N ≮: src (typeOfᴱ H Γ M)) → Warningᴱ+ H Γ (M $ N)
-FunctionDefnMismatchᴱ+ : ∀ {H Γ f x S T B} → (typeOfᴮ H (Γ ⊕ x ↦ S) B ≮: T) → Warningᴱ+ H Γ (function f ⟨ var x ∈ S ⟩∈ T is B end)
+FunctionDefnMismatchᴱ+ : ∀ {H Γ f x S T U B} → (typeOfᴮ H (Γ ⊕ x ↦ T) B ≮: U) → Warningᴱ+ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end)
 BlockMismatchᴱ+ : ∀ {H Γ b T B} → (typeOfᴮ H Γ B ≮: T) → Warningᴱ+ H Γ (block var b ∈ T is B end)
 BinOpMismatch₁ᴱ+ : ∀ {H Γ M op N} → (typeOfᴱ H Γ M ≮: srcBinOp op) → Warningᴱ+ H Γ (binexp M op N)
 BinOpMismatch₂ᴱ+ : ∀ {H Γ M op N} → (typeOfᴱ H Γ N ≮: srcBinOp op) → Warningᴱ+ H Γ (binexp M op N)
-FunctionDefnMismatchᴮ+ : ∀ {H Γ f x S T B C} → (typeOfᴮ H (Γ ⊕ x ↦ S) B ≮: T) → Warningᴮ+ H Γ (function f ⟨ var x ∈ S ⟩∈ T is B end ∙ C)
+FunctionDefnMismatchᴮ+ : ∀ {H Γ f x S T U B C} → (typeOfᴮ H (Γ ⊕ x ↦ T) B ≮: U) → Warningᴮ+ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C)
 LocalVarMismatchᴮ+ : ∀ {H Γ x T M B} → (typeOfᴱ H Γ M ≮: T) → Warningᴮ+ H Γ (local var x ∈ T ← M ∙ B)
 local₁ᴮ+ : ∀ {H Γ x T M B} → Warningᴱ+ H Γ M → Warningᴮ+ H Γ (local var x ∈ T ← M ∙ B)
 local₂ᴮ+ : ∀ {H Γ x T M B} → Warningᴮ+ H (Γ ⊕ x ↦ T) B → Warningᴮ+ H Γ (local var x ∈ T ← M ∙ B)
-function₁ᴱ+ : ∀ {H Γ f x S T B} → Warningᴮ+ H (Γ ⊕ x ↦ S) B → Warningᴱ+ H Γ (function f ⟨ var x ∈ S ⟩∈ T is B end)
-function₁ᴮ+ : ∀ {H Γ f x S T B C} → Warningᴮ+ H (Γ ⊕ x ↦ S) B → Warningᴮ+ H Γ (function f ⟨ var x ∈ S ⟩∈ T is B end ∙ C)
-function₂ᴮ+ : ∀ {H Γ f x S T B C} → Warningᴮ+ H (Γ ⊕ f ↦ (S ⇒ T)) C → Warningᴮ+ H Γ (function f ⟨ var x ∈ S ⟩∈ T is B end ∙ C)
+function₁ᴱ+ : ∀ {H Γ f x S T U B} → Warningᴮ+ H (Γ ⊕ x ↦ T) B → Warningᴱ+ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end)
+function₁ᴮ+ : ∀ {H Γ f x S T U B C} → Warningᴮ+ H (Γ ⊕ x ↦ T) B → Warningᴮ+ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C)
+function₂ᴮ+ : ∀ {H Γ f x S T U B C} → Warningᴮ+ H (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) C → Warningᴮ+ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C)
 
 Unsafe-impl-Warningᴱ H Γ (var x) W with remember (Γ [ x ]ⱽ)
 Unsafe-impl-Warningᴱ H Γ (var x) W | (nothing , p) = expr (UnboundVariable p)
 Unsafe-impl-Warningᴱ H Γ (var x) W | (just T , p) = ctxt (UnsafeVar x p (subst₁ Unsafe (cong orAny p) W  ))
 Unsafe-impl-Warningᴱ H Γ (val (addr a)) W with remember (H [ a ]ᴴ)
 Unsafe-impl-Warningᴱ H Γ (val (addr a)) W | (nothing , p) = expr (UnallocatedAddress p)
-Unsafe-impl-Warningᴱ H Γ (val (addr a)) W | (just (function f ⟨ var x ∈ T ⟩∈ U is B end) , p) = heap (addr a p (UnsafeFunction (subst₁ Unsafe (cong orAny (cong typeOfᴹᴼ p)) W)))
+Unsafe-impl-Warningᴱ H Γ (val (addr a)) W | (just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) , p) = {!!} -- heap (addr a p (UnsafeFunction (subst₁ Unsafe (cong orAny (cong typeOfᴹᴼ p)) W)))
 Unsafe-impl-Warningᴱ H Γ (M $ N) W with Unsafe-resolve (typeOfᴱ H Γ M) (typeOfᴱ H Γ N) W
 Unsafe-impl-Warningᴱ H Γ (M $ N) W | Left p = NotFunctionCallᴱ+ p
 Unsafe-impl-Warningᴱ H Γ (M $ N) W | Right (Left p) = FunctionCallMismatchᴱ+ p
 Unsafe-impl-Warningᴱ H Γ (M $ N) W | Right (Right V) = mapᴱ+ app₁ (Unsafe-impl-Warningᴱ H Γ M V)
-Unsafe-impl-Warningᴱ H Γ (function f ⟨ var c ∈ T ⟩∈ U is B end) W = expr (UnsafeFunction W)
+Unsafe-impl-Warningᴱ H Γ (function f ⟨ S ∌ var c ∈ T ⟩∈ U is B end) W = {!!} -- expr (UnsafeFunction W)
 Unsafe-impl-Warningᴱ H Γ (block var b ∈ T is B end) W = expr (UnsafeBlock W)
 Unsafe-impl-Warningᴱ H Γ (binexp M ·· N) ()
 
 Unsafe-impl-Warningᴮ H Γ (local var x ∈ T ← M ∙ B) W = local₂ᴮ+ (Unsafe-impl-Warningᴮ H (Γ ⊕ x ↦ T) B W)
-Unsafe-impl-Warningᴮ H Γ (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) W = function₂ᴮ+ (Unsafe-impl-Warningᴮ H (Γ ⊕ f ↦ (T ⇒ U)) C W)
+Unsafe-impl-Warningᴮ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) W = {!!} -- function₂ᴮ+ (Unsafe-impl-Warningᴮ H (Γ ⊕ f ↦ (T ⇒ U)) C W)
 Unsafe-impl-Warningᴮ H Γ (return M ∙ B) W = mapᴱᴮ+ return (Unsafe-impl-Warningᴱ H Γ M W)
 
 NotFunctionCallᴱ+ p with dec-Unsafe-≮:ᵘ p
@@ -159,7 +159,7 @@ FunctionCallMismatchᴱ+ p | Left q | _ = mapᴱ+ app₂ (Unsafe-impl-Warningᴱ
 FunctionCallMismatchᴱ+ p | _ | Right q = mapᴱ+ app₁ (Unsafe-impl-Warningᴱ _ _ _ (<:-error-Unsafe q))
 
 FunctionDefnMismatchᴱ+ p with dec-Unsafe-≮:ᵘ p
-FunctionDefnMismatchᴱ+ p | Left q = function₁ᴱ+ (Unsafe-impl-Warningᴮ _ _ _ q)
+FunctionDefnMismatchᴱ+ p | Left q = {!!} -- function₁ᴱ+ (Unsafe-impl-Warningᴮ _ _ _ q)
 FunctionDefnMismatchᴱ+ p | Right q = expr (FunctionDefnMismatch q)
 
 BlockMismatchᴱ+ p with dec-Unsafe-≮:ᵘ p
@@ -175,7 +175,7 @@ BinOpMismatch₂ᴱ+ p | Left q = mapᴱ+ bin₂ (Unsafe-impl-Warningᴱ _ _ _ q
 BinOpMismatch₂ᴱ+ p | Right q = expr (BinOpMismatch₂ q)
 
 FunctionDefnMismatchᴮ+ p with dec-Unsafe-≮:ᵘ p
-FunctionDefnMismatchᴮ+ p | Left q = function₁ᴮ+ (Unsafe-impl-Warningᴮ _ _ _ q)
+FunctionDefnMismatchᴮ+ p | Left q = {!!} -- function₁ᴮ+ (Unsafe-impl-Warningᴮ _ _ _ q)
 FunctionDefnMismatchᴮ+ p | Right q = block (FunctionDefnMismatch q)
 
 LocalVarMismatchᴮ+ p with dec-Unsafe-≮:ᵘ p
@@ -205,7 +205,7 @@ function₁ᴮ+ {x = x} (ctxt (UnsafeVar y r W)) | no x≠y = ctxt (UnsafeVar y 
 function₂ᴮ+ (block W) = block (function₂ W)
 function₂ᴮ+ (heap W) = heap W
 function₂ᴮ+ {f = f} (ctxt (UnsafeVar y r W)) with f ≡ⱽ y
-function₂ᴮ+ {f = f} (ctxt (UnsafeVar f refl W)) | yes refl = block (UnsafeFunction W)
+function₂ᴮ+ {f = f} (ctxt (UnsafeVar f refl W)) | yes refl = {!!} -- block (UnsafeFunction W)
 function₂ᴮ+ {f = f} (ctxt (UnsafeVar y r W)) | no f≠y = ctxt (UnsafeVar y (trans (⊕-lookup-miss f y _ _ f≠y) r) W)
 
 <:-heap-weakeningᴱ : ∀ Γ H M {H′} → (H ⊑ H′) → (typeOfᴱ H′ Γ M <: typeOfᴱ H Γ M)
@@ -219,12 +219,12 @@ function₂ᴮ+ {f = f} (ctxt (UnsafeVar y r W)) | no f≠y = ctxt (UnsafeVar y 
 <:-heap-weakeningᴱ Γ H (val (bool b)) h = <:-refl
 <:-heap-weakeningᴱ Γ H (val (str s)) h = <:-refl
 <:-heap-weakeningᴱ Γ H (M $ N) h = <:-resolve (<:-heap-weakeningᴱ Γ H M h) (<:-heap-weakeningᴱ Γ H N h)
-<:-heap-weakeningᴱ Γ H (function f ⟨ var x ∈ S ⟩∈ T is B end) h = <:-refl
+<:-heap-weakeningᴱ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h = <:-refl
 <:-heap-weakeningᴱ Γ H (block var b ∈ T is N end) h = <:-refl
 <:-heap-weakeningᴱ Γ H (binexp M op N) h = <:-refl
 
 <:-heap-weakeningᴮ : ∀ Γ H B {H′} → (H ⊑ H′) → (typeOfᴮ H′ Γ B <: typeOfᴮ H Γ B)
-<:-heap-weakeningᴮ Γ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) h = <:-heap-weakeningᴮ (Γ ⊕ f ↦ (T ⇒ U)) H B h
+<:-heap-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) h = <:-heap-weakeningᴮ (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) H B h
 <:-heap-weakeningᴮ Γ H (local var x ∈ T ← M ∙ B) h = <:-heap-weakeningᴮ (Γ ⊕ x ↦ T) H B h
 <:-heap-weakeningᴮ Γ H (return M ∙ B) h = <:-heap-weakeningᴱ Γ H M h
 <:-heap-weakeningᴮ Γ H done h = <:-refl
@@ -249,12 +249,12 @@ function₂ᴮ+ {f = f} (ctxt (UnsafeVar y r W)) | no f≠y = ctxt (UnsafeVar y 
 ≡-heap-weakeningᴱ Γ H (M $ N) h | Left W | _ = Left (app₁ W)
 ≡-heap-weakeningᴱ Γ H (M $ N) h | _ | Left W = Left (app₂ W)
 ≡-heap-weakeningᴱ Γ H (M $ N) h | Right p | Right q = Right (cong₂ resolve p q)
-≡-heap-weakeningᴱ Γ H (function f ⟨ var x ∈ S ⟩∈ T is B end) h = Right refl
+≡-heap-weakeningᴱ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h = Right refl
 ≡-heap-weakeningᴱ Γ H (block var b ∈ T is N end) h = Right refl
 ≡-heap-weakeningᴱ Γ H (binexp M op N) h = Right refl
 
 ≡-heap-weakeningᴮ : ∀ Γ H B {H′} → (H ⊑ H′) → Either (Warningᴮ H (typeCheckᴮ H Γ B)) (typeOfᴮ H′ Γ B ≡ typeOfᴮ H Γ B)
-≡-heap-weakeningᴮ Γ H (function f ⟨ var x ∈ S ⟩∈ T is B end ∙ C) h = mapL function₂ (≡-heap-weakeningᴮ (Γ ⊕ f ↦ (S ⇒ T)) H C h)
+≡-heap-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) h = mapL function₂ (≡-heap-weakeningᴮ (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) H C h)
 ≡-heap-weakeningᴮ Γ H (local var x ∈ T ← M ∙ B) h = mapL local₂ (≡-heap-weakeningᴮ (Γ ⊕ x ↦ T) H B h)
 ≡-heap-weakeningᴮ Γ H (return M ∙ B) h = mapL return (≡-heap-weakeningᴱ Γ H M h)
 ≡-heap-weakeningᴮ Γ H done h = Right refl
@@ -283,12 +283,12 @@ binOpPreservation H (·· v w) = refl
 <:-substitutivityᴱ H (val w) v x p = <:-refl
 <:-substitutivityᴱ H (binexp M op N) v x p = <:-refl
 <:-substitutivityᴱ H (M $ N) v x p = <:-resolve (<:-substitutivityᴱ H M v x p) (<:-substitutivityᴱ H N v x p)
-<:-substitutivityᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x p = <:-refl
+<:-substitutivityᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x p = <:-refl
 <:-substitutivityᴱ H (block var b ∈ T is B end) v x p = <:-refl
 <:-substitutivityᴱ-whenever H v x x (yes refl) p = p
 <:-substitutivityᴱ-whenever H v x y (no o) p = (≡-impl-<: (cong orAny (⊕-lookup-miss x y _ _ o)))
 
-<:-substitutivityᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x p = <:-substitutivityᴮ-unless H B v x f (x ≡ⱽ f) p
+<:-substitutivityᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x p = <:-substitutivityᴮ-unless H B v x f (x ≡ⱽ f) p
 <:-substitutivityᴮ H (local var y ∈ T ← M ∙ B) v x p = <:-substitutivityᴮ-unless H B v x y (x ≡ⱽ y) p
 <:-substitutivityᴮ H (return M ∙ B) v x p = <:-substitutivityᴱ H M v x p
 <:-substitutivityᴮ H done v x p = <:-refl
@@ -317,10 +317,10 @@ binOpPreservation H (·· v w) = refl
 
 <:-reductionᴱ H (M $ N) (app₁ s) = mapLR (λ p → <:-resolve (λ {t} → p {t}) (<:-heap-weakeningᴱ ∅ H N (rednᴱ⊑ s))) (mapᴱ+ app₁) (<:-reductionᴱ H M s)
 <:-reductionᴱ H (M $ N) (app₂ q s) = mapLR (λ p → <:-resolve (<:-heap-weakeningᴱ ∅ H M (rednᴱ⊑ s)) (λ {t} → p {t})) (mapᴱ+ app₂) (<:-reductionᴱ H N s)
-<:-reductionᴱ H (M $ N) (beta (function f ⟨ var y ∈ S ⟩∈ U is B end) v refl q) with dec-subtyping (typeOfᴱ H ∅ (val v)) S
-<:-reductionᴱ H (M $ N) (beta (function f ⟨ var y ∈ S ⟩∈ U is B end) v refl q) | Left r = Right (FunctionCallMismatchᴱ+ (≮:-trans-≡ r (cong src (cong orAny (cong typeOfᴹᴼ (sym q))))))
-<:-reductionᴱ H (M $ N) (beta (function f ⟨ var y ∈ S ⟩∈ U is B end) v refl q) | Right r = Left (<:-trans-≡ (<:-resolve-⇒ r) (cong (λ F → resolve F (typeOfᴱ H ∅ N)) (cong orAny (cong typeOfᴹᴼ (sym q)))))
-<:-reductionᴱ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) = Left <:-refl
+<:-reductionᴱ H (M $ N) (beta (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v refl q) with dec-subtyping (typeOfᴱ H ∅ (val v)) S
+<:-reductionᴱ H (M $ N) (beta (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v refl q) | Left r = {!!} -- Right (FunctionCallMismatchᴱ+ (≮:-trans-≡ r (cong src (cong orAny (cong typeOfᴹᴼ (sym q))))))
+<:-reductionᴱ H (M $ N) (beta (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v refl q) | Right r = {!!} -- Left (<:-trans-≡ (<:-resolve-⇒ r) (cong (λ F → resolve F (typeOfᴱ H ∅ N)) (cong orAny (cong typeOfᴹᴼ (sym q)))))
+<:-reductionᴱ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) = Left <:-refl
 <:-reductionᴱ H (block var b ∈ T is B end) (block s) = Left <:-refl
 <:-reductionᴱ H (block var b ∈ T is return (val v) ∙ B end) (return v) with dec-subtyping (typeOfᴱ H ∅ (val v)) T
 <:-reductionᴱ H (block var b ∈ T is return (val v) ∙ B end) (return v) | Left p = Right (BlockMismatchᴱ+ p)
@@ -332,7 +332,7 @@ binOpPreservation H (·· v w) = refl
 <:-reductionᴱ H (binexp M op N) (binOp₁ s) = Left <:-refl
 <:-reductionᴱ H (binexp M op N) (binOp₂ s) = Left <:-refl
 
-<:-reductionᴮ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) (function a defn) = Left (<:-trans (<:-substitutivityᴮ _ B (addr a) f <:-refl) (<:-heap-weakeningᴮ (f ↦ (T ⇒ U)) H B (snoc defn)))
+<:-reductionᴮ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (function a defn) = Left (<:-trans (<:-substitutivityᴮ _ B (addr a) f <:-refl) (<:-heap-weakeningᴮ (f ↦ (((S ⇒ error) ∩ (T ⇒ U)))) H B (snoc defn)))
 <:-reductionᴮ H (local var x ∈ T ← M ∙ B) (local s) = Left (<:-heap-weakeningᴮ (x ↦ T) H B (rednᴱ⊑ s))
 <:-reductionᴮ H (local var x ∈ T ← M ∙ B) (subst v) with dec-subtyping (typeOfᴱ H ∅ (val v)) T
 <:-reductionᴮ H (local var x ∈ T ← M ∙ B) (subst v) | Left p = Right (LocalVarMismatchᴮ+ p)
@@ -366,15 +366,15 @@ reflect-substitutionᴱ H (M $ N) v x (NotFunctionCall (p , _)) | Left q = Left 
 reflect-substitutionᴱ H (M $ N) v x (NotFunctionCall (p , _)) | Right W = Right (Right W)
 reflect-substitutionᴱ H (M $ N) v x (app₁ W) = mapL (mapᴱ+ app₁) (reflect-substitutionᴱ H M v x W)
 reflect-substitutionᴱ H (M $ N) v x (app₂ W) = mapL (mapᴱ+ app₂) (reflect-substitutionᴱ H N v x W)
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (FunctionDefnMismatch (q , _)) = mapLR FunctionDefnMismatchᴱ+ Right (≮:-substitutivityᴮ-unless H B v x y (x ≡ⱽ y) q)
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (UnsafeFunction W′) = Left (expr (UnsafeFunction W′))
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) with reflect-substitutionᴮ-unless H B v x y (x ≡ⱽ y) W
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (block W′) = Left (expr (function₁ W′))
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (heap W′) = Left (heap W′)
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) with y ≡ⱽ z
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar y refl W′)) | yes refl = Left (expr (UnsafeFunction (param W′)))
-reflect-substitutionᴱ {Γ} {S} H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) | no y≠z = Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss y z T (Γ ⊕ x ↦ S) y≠z) p) W′))
-reflect-substitutionᴱ H (function f ⟨ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Right W′ = Right W′
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (FunctionDefnMismatch (q , _)) = mapLR FunctionDefnMismatchᴱ+ Right (≮:-substitutivityᴮ-unless H B v x y (x ≡ⱽ y) q)
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (UnsafeFunction W′) = Left (expr (UnsafeFunction W′))
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) with reflect-substitutionᴮ-unless H B v x y (x ≡ⱽ y) W
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (block W′) = Left (expr (function₁ W′))
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (heap W′) = Left (heap W′)
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) with y ≡ⱽ z
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar y refl W′)) | yes refl = Left (expr (UnsafeFunction (param W′)))
+reflect-substitutionᴱ {Γ} {R} H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) | no y≠z = Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss y z T (Γ ⊕ x ↦ R) y≠z) p) W′))
+reflect-substitutionᴱ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) v x (function₁ W) | Right W′ = Right W′
 reflect-substitutionᴱ H (block var b ∈ T is B end) v x (BlockMismatch (q , _)) = mapLR BlockMismatchᴱ+ Right (≮:-substitutivityᴮ H B v x q)
 reflect-substitutionᴱ H (block var b ∈ T is B end) v x (UnsafeBlock W′) = Left (expr (UnsafeBlock W′))
 reflect-substitutionᴱ H (block var b ∈ T is B end) v x (block₁ W′) = mapL (mapᴮᴱ+ block₁) (reflect-substitutionᴮ H B v x W′)
@@ -386,22 +386,22 @@ reflect-substitutionᴱ H (binexp M op N) v x (bin₂ W) = mapL (mapᴱ+ bin₂)
 reflect-substitutionᴱ-whenever H a x x (yes refl) (UnallocatedAddress p) = Right (Left (UnallocatedAddress p))
 reflect-substitutionᴱ-whenever H v x y (no p) (UnboundVariable q) = Left (expr (UnboundVariable (trans (sym (⊕-lookup-miss x y _ _ p)) q)))
 
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (FunctionDefnMismatch (q , _)) = mapLR FunctionDefnMismatchᴮ+ Right (≮:-substitutivityᴮ-unless H C v x y (x ≡ⱽ y) q)
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (UnsafeFunction W) = Left (block (UnsafeFunction W))
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) with reflect-substitutionᴮ-unless H C v x y (x ≡ⱽ y) W
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (block W′) = Left (block (function₁ W′))
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (heap W′) = Left (heap W′)
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) with y ≡ⱽ z
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar y refl W′)) | yes refl = Left (block (UnsafeFunction (param W′)))
-reflect-substitutionᴮ {Γ} {S} H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) | no y≠z = Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss y z T (Γ ⊕ x ↦ S) y≠z) p) W′))
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Right W′ = Right W′
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) with reflect-substitutionᴮ-unless H B v x f (x ≡ⱽ f) W
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (block W′) = Left (block (function₂ W′))
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (heap W′) = Left (heap W′)
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar z p W′)) with f ≡ⱽ z
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar f refl W′)) | yes refl = Left (block (UnsafeFunction W′))
-reflect-substitutionᴮ {Γ} {S} H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar z p W′)) | no f≠z = Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss f z (T ⇒ U) (Γ ⊕ x ↦ S) f≠z) p) W′))
-reflect-substitutionᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Right W′ = Right W′
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (FunctionDefnMismatch (q , _)) = mapLR FunctionDefnMismatchᴮ+ Right (≮:-substitutivityᴮ-unless H C v x y (x ≡ⱽ y) q)
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (UnsafeFunction W) = Left (block (UnsafeFunction W))
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) with reflect-substitutionᴮ-unless H C v x y (x ≡ⱽ y) W
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (block W′) = Left (block (function₁ W′))
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (heap W′) = Left (heap W′)
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) with y ≡ⱽ z
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar y refl W′)) | yes refl = Left (block (UnsafeFunction (param W′)))
+reflect-substitutionᴮ {Γ} {R} H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Left (ctxt (UnsafeVar z p W′)) | no y≠z = Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss y z T (Γ ⊕ x ↦ R) y≠z) p) W′))
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₁ W) | Right W′ = Right W′
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) with reflect-substitutionᴮ-unless H B v x f (x ≡ⱽ f) W
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (block W′) = Left (block (function₂ W′))
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (heap W′) = Left (heap W′)
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar z p W′)) with f ≡ⱽ z
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar f refl W′)) | yes refl = {!!} -- Left (block (UnsafeFunction W′))
+reflect-substitutionᴮ {Γ} {R} H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Left (ctxt (UnsafeVar z p W′)) | no f≠z = {!!} -- Left (ctxt (UnsafeVar z (trans (⊕-lookup-miss f z (T ⇒ U) (Γ ⊕ x ↦ R) f≠z) p) W′))
+reflect-substitutionᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) v x (function₂ W) | Right W′ = Right W′
 reflect-substitutionᴮ H (local var y ∈ T ← M ∙ B) v x (LocalVarMismatch (q , _)) = mapLR LocalVarMismatchᴮ+ Right (≮:-substitutivityᴱ H M v x q)
 reflect-substitutionᴮ H (local var y ∈ T ← M ∙ B) v x (UnsafeLocal W) = Left (block (UnsafeLocal W))
 reflect-substitutionᴮ H (local var y ∈ T ← M ∙ B) v x (local₁ W) = mapL (mapᴱᴮ+ local₁) (reflect-substitutionᴱ H M v x W)
@@ -435,9 +435,9 @@ reflect-weakeningᴱ Γ H (binexp M op N) h (BinOpMismatch₁ (p , _)) = BinOpMi
 reflect-weakeningᴱ Γ H (binexp M op N) h (BinOpMismatch₂ (p , _)) = BinOpMismatch₂ᴱ+ (≮:-heap-weakeningᴱ Γ H N h p)
 reflect-weakeningᴱ Γ H (binexp M op N) h (bin₁ W′) = mapᴱ+ bin₁ (reflect-weakeningᴱ Γ H M h W′)
 reflect-weakeningᴱ Γ H (binexp M op N) h (bin₂ W′) = mapᴱ+ bin₂ (reflect-weakeningᴱ Γ H N h W′)
-reflect-weakeningᴱ Γ H (function f ⟨ var y ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch (p , _)) = FunctionDefnMismatchᴱ+ (≮:-heap-weakeningᴮ (Γ ⊕ y ↦ T) H B h p)
-reflect-weakeningᴱ Γ H (function f ⟨ var y ∈ T ⟩∈ U is B end) h (UnsafeFunction W) = expr (UnsafeFunction W)
-reflect-weakeningᴱ Γ H (function f ⟨ var y ∈ T ⟩∈ U is B end) h (function₁ W) = function₁ᴱ+ (reflect-weakeningᴮ (Γ ⊕ y ↦ T) H B h W)
+reflect-weakeningᴱ Γ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch (p , _)) = FunctionDefnMismatchᴱ+ (≮:-heap-weakeningᴮ (Γ ⊕ y ↦ T) H B h p)
+reflect-weakeningᴱ Γ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) h (UnsafeFunction W) = expr (UnsafeFunction W)
+reflect-weakeningᴱ Γ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is B end) h (function₁ W) = function₁ᴱ+ (reflect-weakeningᴮ (Γ ⊕ y ↦ T) H B h W)
 reflect-weakeningᴱ Γ H (block var b ∈ T is B end) h (BlockMismatch (p , _)) = BlockMismatchᴱ+ (≮:-heap-weakeningᴮ Γ H B h p)
 reflect-weakeningᴱ Γ H (block var b ∈ T is B end) h (UnsafeBlock W) = expr (UnsafeBlock W)
 reflect-weakeningᴱ Γ H (block var b ∈ T is B end) h (block₁ W) = mapᴮᴱ+ block₁ (reflect-weakeningᴮ Γ H B h W)
@@ -447,23 +447,23 @@ reflect-weakeningᴮ Γ H (local var y ∈ T ← M ∙ B) h (LocalVarMismatch (p
 reflect-weakeningᴮ Γ H (local var y ∈ T ← M ∙ B) h (UnsafeLocal W) = block (UnsafeLocal W)
 reflect-weakeningᴮ Γ H (local var y ∈ T ← M ∙ B) h (local₁ W) = local₁ᴮ+ (reflect-weakeningᴱ Γ H M h W)
 reflect-weakeningᴮ Γ H (local var y ∈ T ← M ∙ B) h (local₂ W) = local₂ᴮ+ (reflect-weakeningᴮ (Γ ⊕ y ↦ T) H B h W)
-reflect-weakeningᴮ Γ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) h (FunctionDefnMismatch (p , _)) = FunctionDefnMismatchᴮ+ (≮:-heap-weakeningᴮ (Γ ⊕ x ↦ T) H C h p)
-reflect-weakeningᴮ Γ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) h (UnsafeFunction W) = block (UnsafeFunction W)
-reflect-weakeningᴮ Γ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) h (function₁ W) = function₁ᴮ+ (reflect-weakeningᴮ (Γ ⊕ x ↦ T) H C h W)
-reflect-weakeningᴮ Γ H (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) h (function₂ W) = function₂ᴮ+ (reflect-weakeningᴮ (Γ ⊕ f ↦ (T ⇒ U)) H B h W)
+reflect-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) h (FunctionDefnMismatch (p , _)) = FunctionDefnMismatchᴮ+ (≮:-heap-weakeningᴮ (Γ ⊕ x ↦ T) H C h p)
+reflect-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) h (UnsafeFunction W) = block (UnsafeFunction W)
+reflect-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) h (function₁ W) = function₁ᴮ+ (reflect-weakeningᴮ (Γ ⊕ x ↦ T) H C h W)
+reflect-weakeningᴮ Γ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) h (function₂ W) = function₂ᴮ+ (reflect-weakeningᴮ (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) H B h W)
 
 reflect-weakeningᴼ : ∀ H O {H′} → (H ⊑ H′) → Warningᴼ H′ (typeCheckᴼ H′ O) → Either (Warningᴴ H (typeCheckᴴ H)) (Warningᴼ H (typeCheckᴼ H O))
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p) with ≡-heap-weakeningᴮ (x ↦ T) H B h
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p)| Left W = Right (function₁ W)
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p)| Right r = Right (FunctionDefnMismatch (≡-trans-≮: (sym r) p))
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (UnsafeFunction W) = Right (UnsafeFunction W)
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) with reflect-weakeningᴮ (x ↦ T) H B h W′
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | block W = Right (function₁ W)
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | heap W = Left W
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) with x ≡ⱽ y
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar x refl W) | yes refl = Right (UnsafeFunction (param W))
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) | no q with trans (⊕-lookup-miss x y T ∅ q) p
-reflect-weakeningᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) | no q | ()
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p) with ≡-heap-weakeningᴮ (x ↦ T) H B h
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p)| Left W = Right (function₁ W)
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (FunctionDefnMismatch p)| Right r = Right (FunctionDefnMismatch (≡-trans-≮: (sym r) p))
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (UnsafeFunction W) = Right (UnsafeFunction W)
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) with reflect-weakeningᴮ (x ↦ T) H B h W′
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | block W = Right (function₁ W)
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | heap W = Left W
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) with x ≡ⱽ y
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar x refl W) | yes refl = Right (UnsafeFunction (param W))
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) | no q with trans (⊕-lookup-miss x y T ∅ q) p
+reflect-weakeningᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) h (function₁ W′) | ctxt (UnsafeVar y p W) | no q | ()
 
 reflectᴱ : ∀ H M {H′ M′} → (H ⊢ M ⟶ᴱ M′ ⊣ H′) → Warningᴱ H′ (typeCheckᴱ H′ ∅ M′) → Warningᴱ+ H ∅ M
 reflectᴮ : ∀ H B {H′ B′} → (H ⊢ B ⟶ᴮ B′ ⊣ H′) → Warningᴮ H′ (typeCheckᴮ H′ ∅ B′) → Warningᴮ+ H ∅ B
@@ -480,23 +480,23 @@ reflectᴱ H (M $ N) (app₂ p s) (FunctionCallMismatch _ (q , _)) | Right ¬W |
 reflectᴱ H (M $ N) (app₂ p s) (NotFunctionCall (q , _)) | Right ¬W  = NotFunctionCallᴱ+ (≮:-heap-weakeningᴱ ∅ H M (rednᴱ⊑ s) q)
 reflectᴱ H (M $ N) (app₂ p s) (app₁ W′) | Right ¬W  = mapᴱ+ app₁ (reflect-weakeningᴱ ∅ H M (rednᴱ⊑ s) W′)
 reflectᴱ H (M $ N) (app₂ p s) (app₂ W′) | Right ¬W  = mapᴱ+ app₂ (reflectᴱ H N s W′)
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W with ≮:-substitutivityᴮ H B v x q 
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W | Left r = heap (addr a p (FunctionDefnMismatch r))
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W | Right r = FunctionCallMismatchᴱ+ (≮:-trans-≡ r ((cong src (cong orAny (cong typeOfᴹᴼ (sym p))))))
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (UnsafeBlock q) | Right ¬W = heap (addr a p (UnsafeFunction (result q)))
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W with reflect-substitutionᴮ _ B v x W′
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (block W) = heap (addr a p (function₁ W))
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (heap W) = heap W
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar y q W)) with x ≡ⱽ y
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar x refl W)) | yes refl = heap (addr a p (UnsafeFunction (param W)))
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar y q W)) | no x≠y = ctxt (UnsafeVar y (trans (⊕-lookup-miss x y T ∅ x≠y) q) W)
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Right (Left W) = expr (app₂ W)
-reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Right (Right q) = FunctionCallMismatchᴱ+ (≮:-trans-≡ q (cong src (cong orAny (cong typeOfᴹᴼ (sym p)))))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W with ≮:-substitutivityᴮ H B v x q 
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W | Left r = heap (addr a p (FunctionDefnMismatch r))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (BlockMismatch (q , _)) | Right ¬W | Right r = {!!} -- FunctionCallMismatchᴱ+ (≮:-trans-≡ r ((cong src (cong orAny (cong typeOfᴹᴼ (sym p))))))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (UnsafeBlock q) | Right ¬W = heap (addr a p (UnsafeFunction (result q)))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W with reflect-substitutionᴮ _ B v x W′
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (block W) = heap (addr a p (function₁ W))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (heap W) = heap W
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar y q W)) with x ≡ⱽ y
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar x refl W)) | yes refl = heap (addr a p (UnsafeFunction (param W)))
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Left (ctxt (UnsafeVar y q W)) | no x≠y = ctxt (UnsafeVar y (trans (⊕-lookup-miss x y T ∅ x≠y) q) W)
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Right (Left W) = expr (app₂ W)
+reflectᴱ H (val (addr a) $ N) (beta (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) v refl p) (block₁ W′) | Right ¬W | Right (Right q) = {!!} -- FunctionCallMismatchᴱ+ (≮:-trans-≡ q (cong src (cong orAny (cong typeOfᴹᴼ (sym p)))))
 reflectᴱ H (block var b ∈ T is B end) (block s) (BlockMismatch (p , _)) = cond BlockMismatchᴱ+ (mapᴮᴱ+ block₁) (≮:-reductionᴮ H B s p)
 reflectᴱ H (block var b ∈ T is B end) (block s) (UnsafeBlock p) = expr (UnsafeBlock p)
 reflectᴱ H (block var b ∈ T is B end) (block s) (block₁ W′) = mapᴮᴱ+ block₁ (reflectᴮ H B s W′)
 reflectᴱ H (block var b ∈ T is B end) (return v) W′ = expr (block₁ (return W′))
-reflectᴱ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (UnallocatedAddress ())
+reflectᴱ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (UnallocatedAddress ())
 reflectᴱ H (binexp M op N) (binOp₀ ()) (UnallocatedAddress p)
 reflectᴱ H (binexp M op N) (binOp₁ s) (BinOpMismatch₁ (p , _)) = cond BinOpMismatch₁ᴱ+ (mapᴱ+ bin₁) (≮:-reductionᴱ H M s p)
 reflectᴱ H (binexp M op N) (binOp₁ s) (BinOpMismatch₂ (p , _)) = BinOpMismatch₂ᴱ+ (≮:-heap-weakeningᴱ ∅ H N (rednᴱ⊑ s) p)
@@ -519,20 +519,20 @@ reflectᴮ H (local var x ∈ T ← M ∙ B) (subst v) W′ | Left (ctxt (Unsafe
 reflectᴮ H (local var x ∈ T ← M ∙ B) (subst v) W′ | Left (ctxt (UnsafeVar y p W)) | no x≠y = ctxt (UnsafeVar y (trans (⊕-lookup-miss x y T ∅ x≠y) p) W)
 reflectᴮ H (local var x ∈ T ← M ∙ B) (subst v) W′ | Right (Left W) = block (local₁ W)
 reflectᴮ H (local var x ∈ T ← M ∙ B) (subst v) W′ | Right (Right W) = LocalVarMismatchᴮ+ W
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ with reflect-substitutionᴮ _ B (addr a) f W′
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (block W) = function₂ᴮ+ (reflect-weakeningᴮ (f ↦ (T ⇒ U)) H B (snoc defn) W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl W)) with reflect-weakeningᴼ H _ (snoc defn) W
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Left W = heap W
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right W with b ≡ᴬ a
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴮ+ p
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (UnsafeFunction W) | yes refl = block (UnsafeFunction W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (function₁ W) | yes refl = block (function₁ W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x p W)) with f ≡ⱽ x
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x refl W)) | yes refl = block (UnsafeFunction W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x p W)) | no f≠x = ctxt (UnsafeVar x (trans (⊕-lookup-miss f x (T ⇒ U) ∅ f≠x) p) W)
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Right (Left (UnallocatedAddress ()))
-reflectᴮ H (function f ⟨ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Right (Right p) = CONTRADICTION (≮:-refl p)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ with reflect-substitutionᴮ _ B (addr a) f W′
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (block W) = {!W!} -- function₂ᴮ+ (reflect-weakeningᴮ (f ↦ (T ⇒ U)) H B (snoc defn) W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl W)) with reflect-weakeningᴼ H _ (snoc defn) W
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Left W = heap W
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right W with b ≡ᴬ a
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴮ+ p
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (UnsafeFunction W) | yes refl = block (UnsafeFunction W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right (function₁ W) | yes refl = block (function₁ W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (heap (addr b refl _)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x p W)) with f ≡ⱽ x
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x refl W)) | yes refl = block (UnsafeFunction W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Left (ctxt (UnsafeVar x p W)) | no f≠x = ctxt (UnsafeVar x (trans (⊕-lookup-miss f x (T ⇒ U) ∅ f≠x) p) W)
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Right (Left (UnallocatedAddress ()))
+reflectᴮ H (function f ⟨ S ∌ var y ∈ T ⟩∈ U is C end ∙ B) (function a defn) W′ | Right (Right p) = {!!} -- CONTRADICTION (≮:-refl p)
 reflectᴮ H (return M ∙ B) (return s) (return W′) = mapᴱᴮ+ return (reflectᴱ H M s W′)
 
 reflectᴱ+ : ∀ H M {H′ M′} → (H ⊢ M ⟶ᴱ M′ ⊣ H′) → Warningᴱ+ H′ ∅ M′ → Warningᴱ+ H ∅ M
@@ -542,13 +542,13 @@ reflectᴱ+ H M S (expr W′) = reflectᴱ H M S W′
 reflectᴱ+ H (M $ N) (app₁ s) (heap W) = mapᴱ+ app₁ (reflectᴱ+ H M s (heap W))
 reflectᴱ+ H (M $ N) (app₂ v s) (heap W) = mapᴱ+ app₂ (reflectᴱ+ H N s (heap W))
 reflectᴱ+ H (M $ N) (beta O v refl p) (heap W) = heap W
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) with reflect-weakeningᴼ H _ (snoc defn) W′
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Left W = heap W
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Right W with b ≡ᴬ a
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴱ+ p
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (UnsafeFunction W) | yes refl = expr (UnsafeFunction W)
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (function₁ W) | yes refl = expr (function₁ W)
-reflectᴱ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) with reflect-weakeningᴼ H _ (snoc defn) W′
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Left W = heap W
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Right W with b ≡ᴬ a
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴱ+ p
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (UnsafeFunction W) | yes refl = expr (UnsafeFunction W)
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr a refl W′)) | Right (function₁ W) | yes refl = expr (function₁ W)
+reflectᴱ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function a defn) (heap (addr b refl W′)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
 reflectᴱ+ H (block var b ∈ T is B end) (block s) (heap W) = mapᴮᴱ+ block₁ (reflectᴮ+ H B s (heap W))
 reflectᴱ+ H (block var b ∈ T is return (val v) ∙ B end) (return v) (heap W) = heap W
 reflectᴱ+ H (block var b ∈ T is done end) done (heap W) = heap W
@@ -558,13 +558,13 @@ reflectᴱ+ H (binexp M op N) (binOp₂ s) (heap W) = mapᴱ+ bin₂ (reflectᴱ
 reflectᴱ+ H M S (ctxt (UnsafeVar x () W′))
 
 reflectᴮ+ H B S (block W′) = reflectᴮ H B S W′
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) with reflect-weakeningᴼ H _ (snoc defn) W′
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Left W = heap W
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Right W with b ≡ᴬ a
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴮ+ p
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (UnsafeFunction W) | yes refl = block (UnsafeFunction W)
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (function₁ W) | yes refl = block (function₁ W)
-reflectᴮ+ H (function f ⟨ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) with reflect-weakeningᴼ H _ (snoc defn) W′
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Left W = heap W
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Right W with b ≡ᴬ a
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (FunctionDefnMismatch p) | yes refl = FunctionDefnMismatchᴮ+ p
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (UnsafeFunction W) | yes refl = block (UnsafeFunction W)
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr a refl W′)) | Right (function₁ W) | yes refl = block (function₁ W)
+reflectᴮ+ H (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end ∙ C) (function a defn) (heap (addr b refl W′)) | Right W | no b≠a = heap (addr b (lookup-not-allocated {H = H} defn b≠a ) W)
 reflectᴮ+ H (local var x ∈ T ← M ∙ B) (local s) (heap W) = mapᴱᴮ+ local₁ (reflectᴱ+ H M s (heap W))
 reflectᴮ+ H (local var x ∈ T ← M ∙ B) (subst v) (heap W) = heap W
 reflectᴮ+ H (return M ∙ B) (return s) (heap W) = mapᴱᴮ+ return (reflectᴱ+ H M s (heap W))
@@ -577,7 +577,7 @@ reflect* H B (step s t) W = reflectᴮ+ H B s (reflect* _ _ t W)
 isntNumber : ∀ H v → (valueType v ≢ num) → (typeOfᴱ H ∅ (val v) ≮: number)
 isntNumber H nil p = scalar-≢-impl-≮: NIL NUMBER (λ ())
 isntNumber H (addr a) p with remember (H [ a ]ᴴ)
-isntNumber H (addr a) p | (just (function f ⟨ var x ∈ T ⟩∈ U is B end) , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (function-≮:-scalar NUMBER)
+isntNumber H (addr a) p | (just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (fun-≮:-scalar ((S ⇒ error) ∩ (T ⇒ U)) NUMBER)
 isntNumber H (addr a) p | (nothing , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (any-≮:-scalar NUMBER)
 isntNumber H (num x) p = CONTRADICTION (p refl)
 isntNumber H (bool x) p = scalar-≢-impl-≮: BOOLEAN NUMBER (λ ())
@@ -586,7 +586,7 @@ isntNumber H (str x) p = scalar-≢-impl-≮: STRING NUMBER (λ ())
 isntString : ∀ H v → (valueType v ≢ str) → (typeOfᴱ H ∅ (val v) ≮: string)
 isntString H nil p = scalar-≢-impl-≮: NIL STRING (λ ())
 isntString H (addr a) p with remember (H [ a ]ᴴ)
-isntString H (addr a) p | (just (function f ⟨ var x ∈ T ⟩∈ U is B end) , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (function-≮:-scalar STRING)
+isntString H (addr a) p | (just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (fun-≮:-scalar ((S ⇒ error) ∩ (T ⇒ U)) STRING)
 isntString H (addr a) p | (nothing , q) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ q)) (any-≮:-scalar STRING)
 isntString H (num x) p = scalar-≢-impl-≮: NUMBER STRING (λ ())
 isntString H (bool x) p = scalar-≢-impl-≮: BOOLEAN STRING (λ ())
@@ -602,7 +602,7 @@ isntFunction H (str x) p = scalar-≮:-function STRING
 isntEmpty : ∀ H v → (typeOfᴱ H ∅ (val v) ≮: never)
 isntEmpty H nil = scalar-≮:-never NIL
 isntEmpty H (addr a) with remember (H [ a ]ᴴ)
-isntEmpty H (addr a) | (just (function f ⟨ var x ∈ T ⟩∈ U is B end) , p) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ p)) function-≮:-never
+isntEmpty H (addr a) | (just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) , p) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ p)) (fun-≮:-never ((S ⇒ error) ∩ (T ⇒ U)))
 isntEmpty H (addr a) | (nothing , p) = ≡-trans-≮: (cong orAny (cong typeOfᴹᴼ p)) any-≮:-never
 isntEmpty H (num x) = scalar-≮:-never NUMBER
 isntEmpty H (bool x) = scalar-≮:-never BOOLEAN

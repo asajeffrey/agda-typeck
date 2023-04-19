@@ -34,6 +34,23 @@ funktion = (never ⇒ any)
 -- Top non-error type
 unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
 
+-- Negated scalar types
+negateScalar : Scalar → Type
+negateScalar NUMBER = ((funktion ∪ string) ∪ nill) ∪ boolean
+negateScalar BOOLEAN = ((funktion ∪ number) ∪ string) ∪ nill
+negateScalar STRING = ((funktion ∪ number) ∪ nill) ∪ boolean
+negateScalar NIL = ((funktion ∪ number) ∪ string) ∪ boolean
+
+-- Negated testable types
+negate : Type → Type
+negate (scalar S) = negateScalar S
+negate (T ⇒ U) = ((number ∪ string) ∪ nill) ∪ boolean
+negate never = unknown
+negate any = never
+negate error = unknown
+negate (T ∪ U) = negate T ∩ negate U
+negate (T ∩ U) = negate T ∪ negate U
+
 lhs : Type → Type
 lhs (T ⇒ _) = T
 lhs (T ∪ _) = T

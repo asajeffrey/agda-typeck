@@ -3,7 +3,8 @@ module Luau.Syntax.ToString where
 open import Agda.Builtin.Bool using (true; false)
 open import Agda.Builtin.Float using (primShowFloat)
 open import Agda.Builtin.String using (primShowString)
-open import Luau.Syntax using (Value; Block; Stat; Expr; VarDec; FunDec; nil; bool; val; var; var_∈_; addr; _$_; function_is_end; return; local_←_; _∙_; done; block_is_end; _⟨_⟩; _⟨_⟩∈_; num; BinaryOperator; +; -; *; /; <; >; ==; ~=; <=; >=; ··; binexp; str)
+open import Luau.Syntax using (Value; Block; Stat; Expr; VarDec; FunDec; nil; bool; val; var; var_∈_; addr; _$_; function_is_end; return; local_←_; _∙_; done; block_is_end; _⟨_⟩; _⟨_⟩∈_; _⟨_∌_⟩∈_; num; BinaryOperator; +; -; *; /; <; >; ==; ~=; <=; >=; ··; binexp; str)
+open import Luau.Type using (never)
 open import FFI.Data.String using (String; _++_)
 open import Luau.Addr.ToString using (addrToString)
 open import Luau.Type.ToString using (typeToString)
@@ -14,10 +15,12 @@ varDecToString (var x) = varToString x
 varDecToString (var x ∈ T) =  varToString x ++ " : " ++ typeToString T
 
 funDecToString : ∀ {a} → FunDec a → String
-funDecToString ("" ⟨ x ⟩∈ T) = "function(" ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString ("" ⟨ never ∌ x ⟩∈ T) = "function(" ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString ("" ⟨ S ∌ x ⟩∈ T) = "function(@checked(~" ++ typeToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
 funDecToString ("" ⟨ x ⟩) = "function(" ++ varDecToString x ++ ")"
-funDecToString (f ⟨ x ⟩∈ T) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ "): " ++ typeToString T
 funDecToString (f ⟨ x ⟩) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ ")"
+funDecToString (f ⟨ never ∌ x ⟩∈ T) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString (f ⟨ S ∌ x ⟩∈ T) = "function " ++ varToString f ++ "( @checked(~" ++ typeToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
 
 binOpToString : BinaryOperator → String
 binOpToString + = "+"

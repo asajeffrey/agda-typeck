@@ -5,8 +5,8 @@ module Luau.StrictMode.ToString where
 open import Agda.Builtin.Nat using (Nat; suc)
 open import FFI.Data.String using (String; _++_)
 open import Luau.Subtyping using (_≮:_; TypedValue; error; witness; scalar; warning; diverge; ⟨untyped⟩; function-ok; function-warning; _↦_; ⟨⟩; ⟨_⟩)
-open import Luau.StrictMode using (Warningᴱ; Warningᴮ; UnallocatedAddress; UnboundVariable; FunctionCallMismatch; FunctionDefnMismatch; BlockMismatch; app₁; app₂; BinOpMismatch₁; BinOpMismatch₂; bin₁; bin₂; block₁; return; LocalVarMismatch; local₁; local₂; function₁; function₂; heap; expr; block; addr; NotFunctionCall; UnsafeFunction; UnsafeBlock; UnsafeLocal)
-open import Luau.Syntax using (Expr; val; yes; var; var_∈_; _⟨_⟩∈_; _$_; addr; num; binexp; nil; function_is_end; block_is_end; done; return; local_←_; _∙_; fun; arg; name)
+open import Luau.StrictMode using (Warningᴱ; Warningᴮ; UnallocatedAddress; UnboundVariable; FunctionCallMismatch; FunctionDefnMismatch; FunctionErrorMismatch; BlockMismatch; app₁; app₂; BinOpMismatch₁; BinOpMismatch₂; bin₁; bin₂; block₁; return; LocalVarMismatch; local₁; local₂; function₁; function₂; heap; expr; block; addr; NotFunctionCall; UnsafeFunction; UnsafeBlock; UnsafeLocal)
+open import Luau.Syntax using (Expr; val; yes; var; var_∈_; _⟨_∌_⟩∈_; _$_; addr; num; binexp; nil; function_is_end; block_is_end; done; return; local_←_; _∙_; fun; arg; name)
 open import Luau.Type using (NUMBER; BOOLEAN; STRING; NIL; _⇒_)
 open import Luau.ErrorSuppression using (_,_)
 open import Luau.TypeCheck using (_⊢ᴮ_∈_; _⊢ᴱ_∈_)
@@ -52,9 +52,10 @@ warningToStringᴱ (M $ N) (FunctionCallMismatch {T = T} {U = U} _ (p , _)) = "F
 warningToStringᴱ (M $ N) (NotFunctionCall {T = T} (p , _)) = "Function has type " ++ typeToString T ++ " which isn't a function type " ++ subtypeWarningToString p
 warningToStringᴱ (M $ N) (app₁ W) = warningToStringᴱ M W
 warningToStringᴱ (M $ N) (app₂ W) = warningToStringᴱ N W
-warningToStringᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) (FunctionDefnMismatch {V = V} (p , _)) = "Function expresion " ++ varToString f ++ " has return type " ++ typeToString U ++ " but body returns " ++ typeToString V ++ subtypeWarningToString p
-warningToStringᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) (UnsafeFunction W) = "Function expresion " ++ varToString f ++ " has unsafe type " ++ typeToString (T ⇒ U)
-warningToStringᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) (function₁ W) = warningToStringᴮ B W ++ "\n  in function expression " ++ varToString f
+warningToStringᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (FunctionDefnMismatch {V = V} (p , _)) = "Function expresion " ++ varToString f ++ " has return type " ++ typeToString U ++ " but body returns " ++ typeToString V ++ subtypeWarningToString p
+warningToStringᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (FunctionErrorMismatch {E = E} p) = "Function expresion " ++ varToString f ++ " has checked type " ++ typeToString S ++ " but body returns " ++ typeToString E ++ subtypeWarningToString p
+warningToStringᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (UnsafeFunction W) = "Function expresion " ++ varToString f ++ " has unsafe type " ++ typeToString (T ⇒ U)
+warningToStringᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) (function₁ W) = warningToStringᴮ B W ++ "\n  in function expression " ++ varToString f
 warningToStringᴱ block var b ∈ T is B end (UnsafeBlock W) =  "Block " ++ varToString b ++ " has unsafe type " ++ typeToString T
 warningToStringᴱ block var b ∈ T is B end (BlockMismatch {U = U} (p , _)) =  "Block " ++ varToString b ++ " has type " ++ typeToString T ++ " but body returns " ++ typeToString U ++ subtypeWarningToString p
 warningToStringᴱ block var b ∈ T is B end (block₁ W) = warningToStringᴮ B W ++ "\n  in block " ++ varToString b
@@ -63,10 +64,11 @@ warningToStringᴱ (binexp M op N) (BinOpMismatch₂ {U = U} (p , _)) = "Binary 
 warningToStringᴱ (binexp M op N) (bin₁ W) = warningToStringᴱ M W
 warningToStringᴱ (binexp M op N) (bin₂ W) = warningToStringᴱ N W
 
-warningToStringᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) (FunctionDefnMismatch {V = V} (p , _)) = "Function declaration " ++ varToString f ++ " has return type " ++ typeToString U ++ " but body returns " ++ typeToString V ++ subtypeWarningToString p
-warningToStringᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) (UnsafeFunction W) = "Function declaration " ++ varToString f ++ " has unsafe type " ++ typeToString (T ⇒ U)
-warningToStringᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) (function₁ W) = warningToStringᴮ C W ++ "\n  in function declaration " ++ varToString f
-warningToStringᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) (function₂ W) = warningToStringᴮ B W
+warningToStringᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (FunctionDefnMismatch {V = V} (p , _)) = "Function declaration " ++ varToString f ++ " has return type " ++ typeToString U ++ " but body returns " ++ typeToString V ++ subtypeWarningToString p
+warningToStringᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (FunctionErrorMismatch {E = E} p) = "Function declaration " ++ varToString f ++ " has checked type " ++ typeToString S ++ " but body returns " ++ typeToString E ++ subtypeWarningToString p
+warningToStringᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (UnsafeFunction W) = "Function declaration " ++ varToString f ++ " has unsafe type " ++ typeToString (T ⇒ U)
+warningToStringᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (function₁ W) = warningToStringᴮ C W ++ "\n  in function declaration " ++ varToString f
+warningToStringᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) (function₂ W) = warningToStringᴮ B W
 warningToStringᴮ (local var x ∈ T ← M ∙ B) (LocalVarMismatch {U = U} (p , _)) =  "Local variable " ++ varToString x ++ " has type " ++ typeToString T ++ " but expression has type " ++ typeToString U ++ subtypeWarningToString p
 warningToStringᴮ (local var x ∈ T ← M ∙ B) (UnsafeLocal W) =  "Local variable " ++ varToString x ++ " has unsafe type " ++ typeToString T
 warningToStringᴮ (local var x ∈ T ← M ∙ B) (local₁ W) = warningToStringᴱ M W ++ "\n  in local variable declaration " ++ varToString x

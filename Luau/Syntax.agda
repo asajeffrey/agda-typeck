@@ -6,7 +6,7 @@ open import Agda.Builtin.Float using (Float)
 open import Agda.Builtin.String using (String)
 open import Luau.Var using (Var)
 open import Luau.Addr using (Addr)
-open import Luau.Type using (Type)
+open import Luau.Type using (Type; never)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
 
 infixr 5 _∙_
@@ -24,16 +24,19 @@ name (var x) = x
 name (var x ∈ T) = x
 
 data FunDec : Annotated → Set where
-  _⟨_⟩∈_ : ∀ {a} → Var → VarDec a → Type → FunDec a
   _⟨_⟩ : Var → VarDec maybe → FunDec maybe
+  _⟨_∌_⟩∈_ : ∀ {a} → Var → Type → VarDec a → Type → FunDec a
+
+_⟨_⟩∈_ : ∀ {a} → Var → VarDec a → Type → FunDec a
+f ⟨ x ⟩∈ T = f ⟨ never ∌ x ⟩∈ T
 
 fun : ∀ {a} → FunDec a → VarDec a
-fun (f ⟨ x ⟩∈ T) = (var f ∈ T)
 fun (f ⟨ x ⟩) = (var f)
+fun (f ⟨ S ∌ x ⟩∈ T) = (var f ∈ T)
 
 arg : ∀ {a} → FunDec a → VarDec a
-arg (f ⟨ x ⟩∈ T) = x
 arg (f ⟨ x ⟩) = x
+arg (f ⟨ S ∌ x ⟩∈ T) = x
 
 data BinaryOperator : Set where
   + : BinaryOperator
@@ -84,9 +87,9 @@ isAnnotatedᴱ (val v) = just (val v)
 isAnnotatedᴱ (M $ N) with isAnnotatedᴱ M | isAnnotatedᴱ N
 isAnnotatedᴱ (M $ N) | just M′ | just N′ = just (M′ $ N′)
 isAnnotatedᴱ (M $ N) | _ | _ = nothing
-isAnnotatedᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) with isAnnotatedᴮ B
-isAnnotatedᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) | just B′ = just (function f ⟨ var x ∈ T ⟩∈ U is B′ end)
-isAnnotatedᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) | _ = nothing
+isAnnotatedᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) with isAnnotatedᴮ B
+isAnnotatedᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) | just B′ = just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B′ end)
+isAnnotatedᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) | _ = nothing
 isAnnotatedᴱ (function _ is B end) = nothing
 isAnnotatedᴱ (block var b ∈ T is B end) with isAnnotatedᴮ B
 isAnnotatedᴱ (block var b ∈ T is B end) | just B′ = just (block var b ∈ T is B′ end)
@@ -96,9 +99,9 @@ isAnnotatedᴱ (binexp M op N) with isAnnotatedᴱ M | isAnnotatedᴱ N
 isAnnotatedᴱ (binexp M op N) | just M′ | just N′ = just (binexp M′ op N′)
 isAnnotatedᴱ (binexp M op N) | _ | _ = nothing
 
-isAnnotatedᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) with isAnnotatedᴮ B | isAnnotatedᴮ C
-isAnnotatedᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) | just B′ | just C′ = just (function f ⟨ var x ∈ T ⟩∈ U is C′ end ∙ B′)
-isAnnotatedᴮ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) | _ | _ = nothing
+isAnnotatedᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) with isAnnotatedᴮ B | isAnnotatedᴮ C
+isAnnotatedᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) | just B′ | just C′ = just (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C′ end ∙ B′)
+isAnnotatedᴮ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) | _ | _ = nothing
 isAnnotatedᴮ (function _ is C end ∙ B) = nothing
 isAnnotatedᴮ (local var x ∈ T ← M ∙ B) with isAnnotatedᴱ M | isAnnotatedᴮ B
 isAnnotatedᴮ (local var x ∈ T ← M ∙ B) | just M′ | just B′ = just (local var x ∈ T ← M′ ∙ B′)

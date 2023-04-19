@@ -60,6 +60,9 @@ fun-¬scalar s (F ∩ G) (p , q) = fun-¬scalar s G q
 scalar-≮:-fun : ∀ {F} → FunType F → ∀ S → scalar S ≮: F
 scalar-≮:-fun F s = witness (scalar s) (¬scalar-fun F s)
 
+fun-≮:-scalar : ∀ {F} → FunType F → ∀ S → F ≮: scalar S
+fun-≮:-scalar F s = witness (fun-function F) (scalar-function s)
+
 -- function types aren't errors
 fun-¬error : ∀ {F t} → FunType F → Language F t → ¬Language error t
 fun-¬error (S ⇒ T) (function-nok p) = error
