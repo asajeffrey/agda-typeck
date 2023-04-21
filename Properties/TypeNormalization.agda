@@ -3,16 +3,19 @@
 module Properties.TypeNormalization where
 
 open import Agda.Builtin.Equality using (refl)
-open import Luau.Type using (Type; Scalar; nill; number; string; boolean; error; never; any; unknown; scalar; _⇒_; _∪_; _∩_; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; _≡ᵀ_)
+open import Luau.Type using (Type; Scalar; nill; number; string; boolean; error; never; any; unknown; scalar; check; _⇒_; _∪_; _∩_; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; _≡ᵀ_)
 open import Luau.Subtyping using (Language; ¬Language; scalar; any; left; right; function-ok; function-error; function-nok; function-warning; scalar-warning; scalar-function; function-scalar; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge)
 open import Luau.TypeNormalization using (_∪ⁿ_; _∩ⁿ_; _∪ᶠ_; _∪ⁿˢ_; _∩ⁿˢ_; normalize)
 open import Luau.Subtyping using (_<:_; _≮:_; witness; never)
 open import Properties.Dec using (Dec; yes; no)
-open import Properties.Subtyping using (<:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never)
+open import Properties.Subtyping using (<:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-∩-assocl; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; ∩-distr-∪-<:; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never; check-dist-∩-<:; <:-check-dist-∪; <:-check)
 
 data ErrScalar : Type → Set where
   error : ErrScalar error
   scalar : ∀ S → ErrScalar (scalar S)
+
+data Check : Type → Set where
+  check : ∀ T → Check(check T)
 
 -- Normal forms for types
 data FunType : Type → Set
@@ -23,8 +26,7 @@ data FunType where
   _∩_ : ∀ {F G} → FunType F → FunType G → FunType (F ∩ G)
 
 data Normal where
-  _⇒_ : ∀ S T → Normal (S ⇒ T)
-  _∩_ : ∀ {F G} → FunType F → FunType G → Normal (F ∩ G)
+  _∩_ : ∀ {F G} → FunType F → Check G → Normal (F ∩ G)
   _∪_ : ∀ {S T} → Normal S → ErrScalar T → Normal (S ∪ T)
   never : Normal never
 
@@ -79,11 +81,10 @@ error-≮:-fun F = witness error (¬error-fun F)
 
 -- unknown is normal
 normal-unknown : Normal unknown
-normal-unknown = ((((never ⇒ any) ∪ scalar NUMBER) ∪ scalar STRING) ∪ scalar NIL) ∪ scalar BOOLEAN
+normal-unknown = (((((never ⇒ any) ∩ (check any)) ∪ scalar NUMBER) ∪ scalar STRING) ∪ scalar NIL) ∪ scalar BOOLEAN
 
 -- Normalization produces normal types
 normal : ∀ T → Normal (normalize T)
-normalᶠ : ∀ {F} → FunType F → Normal F
 normal-∪ⁿ : ∀ {S T} → Normal S → Normal T → Normal (S ∪ⁿ T)
 normal-∩ⁿ : ∀ {S T} → Normal S → Normal T → Normal (S ∩ⁿ T)
 normal-∪ⁿˢ : ∀ {S T} → Normal S → OptScalar T → Normal (S ∪ⁿˢ T)
@@ -91,47 +92,33 @@ normal-∩ⁿˢ : ∀ {S T} → Normal S → ErrScalar T → OptScalar (S ∩ⁿ
 normal-∪ᶠ : ∀ {F G} → FunType F → FunType G → FunType (F ∪ᶠ G)
 
 normal (scalar S) = never ∪ scalar S
-normal (S ⇒ T) = S ⇒ T
+normal (S ⇒ T) = (S ⇒ T) ∩ (check any)
+normal (check S) = (never ⇒ any) ∩ (check S)
 normal never = never
 normal any = normal-unknown ∪ error
 normal error = never ∪ error
 normal (S ∪ T) = normal-∪ⁿ (normal S) (normal T)
 normal (S ∩ T) = normal-∩ⁿ (normal S) (normal T)
 
-normalᶠ (S ⇒ T) = S ⇒ T
-normalᶠ (F ∩ G) = F ∩ G
-
 normal-∪ⁿ S (T₁ ∪ T₂) = (normal-∪ⁿ S T₁) ∪ T₂
 normal-∪ⁿ S never = S
-normal-∪ⁿ never (T ⇒ U) = T ⇒ U
 normal-∪ⁿ never (G₁ ∩ G₂) = G₁ ∩ G₂
-normal-∪ⁿ (R ⇒ S) (T ⇒ U) = normalᶠ (normal-∪ᶠ (R ⇒ S) (T ⇒ U))
-normal-∪ⁿ (R ⇒ S) (G₁ ∩ G₂) = normalᶠ (normal-∪ᶠ (R ⇒ S) (G₁ ∩ G₂))
-normal-∪ⁿ (F₁ ∩ F₂) (T ⇒ U) = normalᶠ (normal-∪ᶠ (F₁ ∩ F₂) (T ⇒ U))
-normal-∪ⁿ (F₁ ∩ F₂) (G₁ ∩ G₂) = normalᶠ (normal-∪ᶠ (F₁ ∩ F₂) (G₁ ∩ G₂))
-normal-∪ⁿ (S₁ ∪ S₂) (T₁ ⇒ T₂) = normal-∪ⁿ S₁ (T₁ ⇒ T₂) ∪ S₂
+normal-∪ⁿ (F ∩ check S) (G ∩ check T) = normal-∪ᶠ F G ∩ check (S ∪ T)
 normal-∪ⁿ (S₁ ∪ S₂) (G₁ ∩ G₂) = normal-∪ⁿ S₁ (G₁ ∩ G₂) ∪ S₂
 
 normal-∩ⁿ S never = never
 normal-∩ⁿ S (T ∪ U) = normal-∪ⁿˢ (normal-∩ⁿ S T) (normal-∩ⁿˢ S U )
-normal-∩ⁿ never (T ⇒ U) = never
-normal-∩ⁿ (R ⇒ S) (T ⇒ U) = (R ⇒ S) ∩ (T ⇒ U)
-normal-∩ⁿ (R ∩ S) (T ⇒ U) = (R ∩ S) ∩ (T ⇒ U)
-normal-∩ⁿ (R ∪ S) (T ⇒ U) = normal-∩ⁿ R (T ⇒ U)
 normal-∩ⁿ never (T ∩ U) = never
-normal-∩ⁿ (R ⇒ S) (T ∩ U) = (R ⇒ S) ∩ (T ∩ U)
-normal-∩ⁿ (R ∩ S) (T ∩ U) = (R ∩ S) ∩ (T ∩ U)
-normal-∩ⁿ (R ∪ S) (T ∩ U) = normal-∩ⁿ R (T ∩ U)
+normal-∩ⁿ (R ∪ S) (G ∩ check T) = normal-∩ⁿ R (G ∩ check T)
+normal-∩ⁿ (F ∩ check S) (G ∩ check T) = (F ∩ G) ∩ check (S ∩ T)
 
 normal-∪ⁿˢ S never = S
 normal-∪ⁿˢ never (scalar T) = never ∪ (scalar T)
-normal-∪ⁿˢ (R ⇒ S) (scalar T) = (R ⇒ S) ∪ (scalar T)
 normal-∪ⁿˢ (R ∩ S) (scalar T) = (R ∩ S) ∪ (scalar T)
 normal-∪ⁿˢ (R ∪ scalar S) (scalar T) with S ≡ˢ T
 normal-∪ⁿˢ (R ∪ scalar S) (scalar T) | yes refl = R ∪ scalar S
 normal-∪ⁿˢ (R ∪ scalar S) (scalar T) | no p = normal-∪ⁿˢ R (scalar T) ∪ scalar S
 normal-∪ⁿˢ (R ∪ error) (scalar T) = normal-∪ⁿˢ R (scalar T) ∪ error
-normal-∪ⁿˢ (R ⇒ S) error = (R ⇒ S) ∪ error
 normal-∪ⁿˢ (F ∩ G) error = (F ∩ G) ∪ error
 normal-∪ⁿˢ (R ∪ error) error = R ∪ error
 normal-∪ⁿˢ (R ∪ scalar S) error = normal-∪ⁿˢ R error ∪ scalar S
@@ -139,8 +126,6 @@ normal-∪ⁿˢ never error = never ∪ error
 
 normal-∩ⁿˢ never (scalar T) = never
 normal-∩ⁿˢ never error = never
-normal-∩ⁿˢ (R ⇒ S) (scalar T) = never
-normal-∩ⁿˢ (R ⇒ S) error = never
 normal-∩ⁿˢ (R ∩ S) (scalar T) = never
 normal-∩ⁿˢ (R ∩ S) error = never
 normal-∩ⁿˢ (R ∪ scalar S) (scalar T) with S ≡ˢ T
@@ -162,6 +147,10 @@ fun-∩-error-<:-never : ∀ {F} → FunType F → ∀ {V} → (F ∩ error) <: 
 fun-∩-error-<:-never (T ⇒ U) = function-∩-error-<:-never
 fun-∩-error-<:-never (F ∩ G) = <:-trans (<:-intersect <:-∩-left <:-refl) (fun-∩-error-<:-never F)
 
+fun-∩-errscalar-<:-never : ∀ {F} → FunType F → ∀ {S} → ErrScalar S → ∀ {V} → (F ∩ S) <: V
+fun-∩-errscalar-<:-never F error = fun-∩-error-<:-never F
+fun-∩-errscalar-<:-never F (scalar S) = fun-∩-scalar-<:-never F S
+
 flipper : ∀ {S T U} → ((S ∪ T) ∪ U) <: ((S ∪ U) ∪ T)
 flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪-assocl)
 
@@ -177,32 +166,19 @@ flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪
 
 ∩-<:-∩ⁿ S never = <:-∩-right
 ∩-<:-∩ⁿ S (T ∪ U) = <:-trans <:-∩-distl-∪ (<:-trans (<:-union (∩-<:-∩ⁿ S T) (∩-<:-∩ⁿˢ S U)) (∪-<:-∪ⁿˢ (normal-∩ⁿ S T) (normal-∩ⁿˢ S U)) )
-∩-<:-∩ⁿ never (T ⇒ U) = <:-∩-left
-∩-<:-∩ⁿ (R ⇒ S) (T ⇒ U) = <:-refl
-∩-<:-∩ⁿ (R ∩ S) (T ⇒ U) = <:-refl
-∩-<:-∩ⁿ (R ∪ S) (T ⇒ U) = <:-trans <:-∩-distr-∪ (<:-trans (<:-union (∩-<:-∩ⁿ R (T ⇒ U)) (<:-trans <:-∩-symm (∩-<:-∩ⁿˢ (T ⇒ U) S))) (<:-∪-lub <:-refl <:-never))
 ∩-<:-∩ⁿ never (T ∩ U) = <:-∩-left
-∩-<:-∩ⁿ (R ⇒ S) (T ∩ U) = <:-refl
-∩-<:-∩ⁿ (R ∩ S) (T ∩ U) = <:-refl
-∩-<:-∩ⁿ (R ∪ S) (T ∩ U) = <:-trans <:-∩-distr-∪ (<:-trans (<:-union (∩-<:-∩ⁿ R (T ∩ U)) (<:-trans <:-∩-symm (∩-<:-∩ⁿˢ (T ∩ U) S))) (<:-∪-lub <:-refl <:-never))
+∩-<:-∩ⁿ (F ∩ check S) (G ∩ check T) = <:-∩-glb (<:-intersect <:-∩-left <:-∩-left) (<:-trans (<:-intersect <:-∩-right <:-∩-right) check-dist-∩-<:)
+∩-<:-∩ⁿ (R ∪ S) (G ∩ check T) = <:-trans <:-∩-distr-∪ (<:-∪-lub (∩-<:-∩ⁿ R (G ∩ check T)) (<:-trans <:-∩-assocl (<:-trans <:-∩-left (<:-trans <:-∩-symm (fun-∩-errscalar-<:-never G S)))))
 
 ∩ⁿ-<:-∩ S never = <:-never
 ∩ⁿ-<:-∩ S (T ∪ U) = <:-trans (∪ⁿˢ-<:-∪ (normal-∩ⁿ S T) (normal-∩ⁿˢ S U)) (<:-trans (<:-union (∩ⁿ-<:-∩ S T) (∩ⁿˢ-<:-∩ S U)) ∩-distl-∪-<:)
-∩ⁿ-<:-∩ never (T ⇒ U) = <:-never
-∩ⁿ-<:-∩ (R ⇒ S) (T ⇒ U) = <:-refl
-∩ⁿ-<:-∩ (R ∩ S) (T ⇒ U) = <:-refl
-∩ⁿ-<:-∩ (R ∪ S) (T ⇒ U) = <:-trans (∩ⁿ-<:-∩ R (T ⇒ U)) (<:-∩-glb (<:-trans <:-∩-left <:-∪-left) <:-∩-right)
 ∩ⁿ-<:-∩ never (T ∩ U) = <:-never
-∩ⁿ-<:-∩ (R ⇒ S) (T ∩ U) = <:-refl
-∩ⁿ-<:-∩ (R ∩ S) (T ∩ U) = <:-refl
-∩ⁿ-<:-∩ (R ∪ S) (T ∩ U) = <:-trans (∩ⁿ-<:-∩ R (T ∩ U)) (<:-∩-glb (<:-trans <:-∩-left <:-∪-left) <:-∩-right)
+∩ⁿ-<:-∩ (F ∩ check S) (G ∩ check T) = <:-∩-glb (<:-intersect <:-∩-left (<:-check <:-∩-left)) (<:-intersect <:-∩-right (<:-check <:-∩-right))
+∩ⁿ-<:-∩ (R ∪ S) (G ∩ check T) = <:-trans (∩ⁿ-<:-∩ R (G ∩ check T)) (<:-intersect <:-∪-left <:-refl)
 
 ∩-<:-∩ⁿˢ never (scalar T) = <:-∩-left
 ∩-<:-∩ⁿˢ never error = <:-∩-left
-∩-<:-∩ⁿˢ (R ⇒ S) error = function-∩-error-<:-never
-∩-<:-∩ⁿˢ (R ⇒ S) (scalar T) = fun-∩-scalar-<:-never (R ⇒ S) T
-∩-<:-∩ⁿˢ (F ∩ G) error = fun-∩-error-<:-never (F ∩ G)
-∩-<:-∩ⁿˢ (F ∩ G) (scalar S) = fun-∩-scalar-<:-never (F ∩ G) S
+∩-<:-∩ⁿˢ (F ∩ check S) T = <:-trans (<:-intersect <:-∩-left <:-refl) (fun-∩-errscalar-<:-never F T)
 ∩-<:-∩ⁿˢ (R ∪ scalar S) (scalar T) with S ≡ˢ T
 ∩-<:-∩ⁿˢ (R ∪ scalar S) (scalar T) | yes refl = <:-∩-right
 ∩-<:-∩ⁿˢ (R ∪ scalar S) (scalar T) | no p = <:-trans <:-∩-distr-∪ (<:-∪-lub (∩-<:-∩ⁿˢ R (scalar T)) (scalar-≢-∩-<:-never S T p))
@@ -211,7 +187,6 @@ flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪
 ∩-<:-∩ⁿˢ (R ∪ scalar T) error = <:-trans <:-∩-distr-∪ (<:-∪-lub (∩-<:-∩ⁿˢ R error) (scalar-∩-error-<:-never T))
 
 ∩ⁿˢ-<:-∩ never T = <:-never
-∩ⁿˢ-<:-∩ (R ⇒ S) T = <:-never
 ∩ⁿˢ-<:-∩ (F ∩ G) T = <:-never
 ∩ⁿˢ-<:-∩ (R ∪ scalar S) (scalar T) with S ≡ˢ T
 ∩ⁿˢ-<:-∩ (R ∪ scalar S) (scalar T) | yes refl = <:-∩-glb <:-∪-right <:-refl
@@ -232,8 +207,6 @@ flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪
 ∪ⁿˢ-<:-∪ S never = <:-∪-left
 ∪ⁿˢ-<:-∪ never (scalar T) = <:-refl
 ∪ⁿˢ-<:-∪ never error = <:-refl
-∪ⁿˢ-<:-∪ (R ⇒ S) (scalar T) = <:-refl
-∪ⁿˢ-<:-∪ (R ⇒ S) error = <:-refl
 ∪ⁿˢ-<:-∪ (R ∩ S) (scalar T) = <:-refl
 ∪ⁿˢ-<:-∪ (R ∩ S) error = <:-refl
 ∪ⁿˢ-<:-∪ (R ∪ scalar S) (scalar T) with S ≡ˢ T
@@ -246,8 +219,6 @@ flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪
 ∪-<:-∪ⁿˢ T never = <:-∪-lub <:-refl <:-never
 ∪-<:-∪ⁿˢ never (scalar T) = <:-refl
 ∪-<:-∪ⁿˢ never error = <:-refl
-∪-<:-∪ⁿˢ (R ⇒ S) (scalar T) = <:-refl
-∪-<:-∪ⁿˢ (R ⇒ S) error = <:-refl
 ∪-<:-∪ⁿˢ (R ∩ S) (scalar T) = <:-refl
 ∪-<:-∪ⁿˢ (R ∩ S) error = <:-refl
 ∪-<:-∪ⁿˢ (R ∪ scalar S) (scalar T) with S ≡ˢ T
@@ -258,27 +229,16 @@ flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪
 ∪-<:-∪ⁿˢ (R ∪ error) error = <:-∪-lub <:-refl <:-∪-right
 
 ∪ⁿ-<:-∪ S never = <:-∪-left
-∪ⁿ-<:-∪ never (T ⇒ U) = <:-∪-right
-∪ⁿ-<:-∪ (R ⇒ S) (T ⇒ U) = ∪ᶠ-<:-∪ (R ⇒ S) (T ⇒ U)
-∪ⁿ-<:-∪ (R ∩ S) (T ⇒ U) = ∪ᶠ-<:-∪ (R ∩ S) (T ⇒ U)
-∪ⁿ-<:-∪ (R ∪ S) (T ⇒ U) = <:-trans (<:-union (∪ⁿ-<:-∪ R (T ⇒ U)) <:-refl) (<:-∪-lub (<:-∪-lub (<:-trans <:-∪-left <:-∪-left) <:-∪-right) (<:-trans <:-∪-right <:-∪-left))
-∪ⁿ-<:-∪ never (T ∩ U) = <:-∪-right
-∪ⁿ-<:-∪ (R ⇒ S) (T ∩ U) = ∪ᶠ-<:-∪ (R ⇒ S) (T ∩ U)
-∪ⁿ-<:-∪ (R ∩ S) (T ∩ U) = ∪ᶠ-<:-∪ (R ∩ S) (T ∩ U)
-∪ⁿ-<:-∪ (R ∪ S) (T ∩ U) = <:-trans (<:-union (∪ⁿ-<:-∪ R (T ∩ U)) <:-refl) (<:-∪-lub (<:-∪-lub (<:-trans <:-∪-left <:-∪-left) <:-∪-right) (<:-trans <:-∪-right <:-∪-left))
+∪ⁿ-<:-∪ never (G ∩ check T) = <:-∪-right
+∪ⁿ-<:-∪ (F ∩ check S) (G ∩ check T) = <:-trans (<:-intersect (∪ᶠ-<:-∪ F G) <:-refl) (<:-trans (<:-intersect <:-refl <:-check-dist-∪) {!<:-!}) -- (<:-trans <:-∩-distr-∪ (<:-union (<:-intersect <:-refl {!!}) {!!})) -- ∪ᶠ-<:-∪ (R ∩ S) (T ∩ U)
+∪ⁿ-<:-∪ (R ∪ S) (G ∩ check T) = <:-trans (<:-union (∪ⁿ-<:-∪ R (G ∩ check T)) <:-refl) (<:-∪-lub (<:-∪-lub (<:-trans <:-∪-left <:-∪-left) <:-∪-right) (<:-trans <:-∪-right <:-∪-left))
 ∪ⁿ-<:-∪ S (T ∪ U) = <:-∪-lub (<:-trans (∪ⁿ-<:-∪ S T) (<:-union <:-refl <:-∪-left)) (<:-trans <:-∪-right <:-∪-right)
 
 ∪-<:-∪ⁿ S never = <:-∪-lub <:-refl <:-never
-∪-<:-∪ⁿ never (T ⇒ U) = <:-∪-lub <:-never <:-refl
-∪-<:-∪ⁿ (R ⇒ S) (T ⇒ U) = ∪-<:-∪ᶠ (R ⇒ S) (T ⇒ U)
-∪-<:-∪ⁿ (R ∩ S) (T ⇒ U) = ∪-<:-∪ᶠ (R ∩ S) (T ⇒ U)
-∪-<:-∪ⁿ (R ∪ S) (T ⇒ U) = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) (<:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ R (T ⇒ U)) <:-refl)))
 ∪-<:-∪ⁿ never (T ∩ U) = <:-∪-lub <:-never <:-refl
-∪-<:-∪ⁿ (R ⇒ S) (T ∩ U) = ∪-<:-∪ᶠ (R ⇒ S) (T ∩ U)
-∪-<:-∪ⁿ (R ∩ S) (T ∩ U) = ∪-<:-∪ᶠ (R ∩ S) (T ∩ U)
+∪-<:-∪ⁿ (R ∩ S) (T ∩ U) = {!!} -- ∪-<:-∪ᶠ (R ∩ S) (T ∩ U)
 ∪-<:-∪ⁿ (R ∪ S) (T ∩ U) = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) (<:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ R (T ∩ U)) <:-refl)))
 ∪-<:-∪ⁿ never (T ∪ U) = <:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ never T) <:-refl)
-∪-<:-∪ⁿ (R ⇒ S) (T ∪ U) = <:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ (R ⇒ S) T) <:-refl)
 ∪-<:-∪ⁿ (R ∩ S) (T ∪ U) = <:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ (R ∩ S) T) <:-refl)
 ∪-<:-∪ⁿ (R ∪ S) (T ∪ U) = <:-trans <:-∪-assocl (<:-union (∪-<:-∪ⁿ (R ∪ S) T) <:-refl)
 
@@ -287,7 +247,8 @@ normalize-<: : ∀ T → normalize T <: T
 
 <:-normalize (scalar T) = <:-∪-right
 <:-normalize error = <:-∪-right
-<:-normalize (S ⇒ T) = <:-refl
+<:-normalize (S ⇒ T) = {!!} 
+<:-normalize (check S) = {!!} 
 <:-normalize never = <:-refl
 <:-normalize any = <:-everything
 <:-normalize (S ∪ T) = <:-trans (<:-union (<:-normalize S) (<:-normalize T)) (∪-<:-∪ⁿ (normal S) (normal T))
@@ -295,7 +256,8 @@ normalize-<: : ∀ T → normalize T <: T
 
 normalize-<: (scalar T) = <:-∪-lub <:-never <:-refl
 normalize-<: error = <:-∪-lub <:-never <:-refl
-normalize-<: (S ⇒ T) = <:-refl
+normalize-<: (S ⇒ T) = {!!} 
+normalize-<: (check S) = {!!} 
 normalize-<: never = <:-refl
 normalize-<: any = <:-any
 normalize-<: (S ∪ T) = <:-trans (∪ⁿ-<:-∪ (normal S) (normal T)) (<:-union (normalize-<: S) (normalize-<: T))

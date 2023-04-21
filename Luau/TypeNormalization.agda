@@ -1,6 +1,6 @@
 module Luau.TypeNormalization where
 
-open import Luau.Type using (Type; nill; number; string; boolean; error; never; any; unknown; scalar; _⇒_; _∪_; _∩_; _≡ˢ_)
+open import Luau.Type using (Type; nill; number; string; boolean; error; never; any; unknown; scalar; check; _⇒_; _∪_; _∩_; _≡ˢ_)
 open import Properties.Dec using (Dec; yes; no)
 
 -- Operations on normalized types
@@ -21,14 +21,16 @@ S ∪ⁿ (T₁ ∪ T₂) = (S ∪ⁿ T₁) ∪ T₂
 S ∪ⁿ never = S
 never ∪ⁿ T = T
 (S₁ ∪ S₂) ∪ⁿ G = (S₁ ∪ⁿ G) ∪ S₂
-F ∪ⁿ G = F ∪ᶠ G
+(F ∩ check S) ∪ⁿ (G ∩ check T) = (F ∪ᶠ G) ∩ check (S ∪ T)
+S ∪ⁿ T = S ∪ T
 
 -- Intersection of normalized types
 S ∩ⁿ (T₁ ∪ T₂) = (S ∩ⁿ T₁) ∪ⁿˢ (S ∩ⁿˢ T₂)
 S ∩ⁿ never = never
-(S₁ ∪ S₂) ∩ⁿ G = (S₁ ∩ⁿ G)
-never ∩ⁿ G = never
-F ∩ⁿ G = F ∩ G
+(S₁ ∪ S₂) ∩ⁿ T = (S₁ ∩ⁿ T) ∪ⁿˢ (T ∩ⁿˢ S₂)
+never ∩ⁿ T = never
+(F ∩ check S) ∩ⁿ (G ∩ check T) = (F ∩ G) ∩ check(S ∩ T)
+S ∩ⁿ T = S ∩ T
 
 -- Intersection of normalized types with a scalar/error
 (R ∪ scalar S) ∩ⁿˢ (scalar T) with S ≡ˢ T
@@ -52,7 +54,8 @@ F ∪ⁿˢ T = F ∪ T
 -- Normalize!
 normalize : Type → Type
 normalize (scalar S) = never ∪ (scalar S)
-normalize (S ⇒ T) = (S ⇒ T)
+normalize (S ⇒ T) = (S ⇒ T) ∩ (check any)
+normalize (check S) = (never ⇒ any) ∩ (check S)
 normalize never = never
 normalize any = unknown ∪ error
 normalize error = never ∪ error

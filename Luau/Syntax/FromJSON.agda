@@ -2,7 +2,7 @@
 
 module Luau.Syntax.FromJSON where
 
-open import Luau.Syntax using (Block; Stat ; Expr; _$_; val; nil; bool; num; str; var; var_∈_; function_is_end; _⟨_⟩; _⟨_⟩∈_;_⟨_∌_⟩∈_; local_←_; return; done; _∙_; maybe; VarDec;  binexp; BinaryOperator; +; -; *; /; ==; ~=; <; >; <=; >=; ··)
+open import Luau.Syntax using (Block; Stat ; Expr; _$_; val; nil; bool; num; str; var; var_∈_; function_is_end; _⟨_⟩; _⟨_⟩∈_;_⟨_∋_⟩∈_; local_←_; return; done; _∙_; maybe; VarDec;  binexp; BinaryOperator; +; -; *; /; ==; ~=; <; >; <=; >=; ··)
 open import Luau.Type.FromJSON using (typeFromJSON)
 
 open import Agda.Builtin.List using (List; _∷_; [])
@@ -167,7 +167,7 @@ statFromObject obj | just(string "AstStatLocal") | nothing | _ = Left "AstStatLo
 statFromObject obj | just(string "AstStatLocalFunction") with lookup name obj | lookup func obj
 statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value with varDecFromJSON fnName | exprFromJSON value
 statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value | Right fnVar | Right (function "" ⟨ x ⟩ is B end) = Right (function (Luau.Syntax.name fnVar) ⟨ x ⟩ is B end)
-statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value | Right fnVar | Right (function "" ⟨ S ∌ x ⟩∈ T is B end) = Right (function (Luau.Syntax.name fnVar) ⟨ S ∌ x ⟩∈ T is B end)
+statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value | Right fnVar | Right (function "" ⟨ S ∋ x ⟩∈ T is B end) = Right (function (Luau.Syntax.name fnVar) ⟨ S ∋ x ⟩∈ T is B end)
 statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value | Left err | _ = Left err
 statFromObject obj | just(string "AstStatLocalFunction") | just fnName | just value | _ | Left err = Left err
 statFromObject obj | just(string "AstStatLocalFunction") | just _ | just _ | Right _ | Right _ = Left "AstStatLocalFunction func is not an AstExprFunction"

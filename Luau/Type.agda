@@ -17,6 +17,7 @@ data Type : Set where
 
   scalar : Scalar → Type
   _⇒_ : Type → Type → Type
+  check : Type → Type
   never : Type
   any : Type
   error : Type
@@ -29,7 +30,7 @@ string = scalar STRING
 nill = scalar NIL
 
 -- Top function type
-funktion = (never ⇒ any)
+funktion = (never ⇒ any) ∩ (check any)
 
 -- Top non-error type
 unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
@@ -45,6 +46,7 @@ negateScalar NIL = ((funktion ∪ number) ∪ string) ∪ boolean
 negate : Type → Type
 negate (scalar S) = negateScalar S
 negate (T ⇒ U) = ((number ∪ string) ∪ nill) ∪ boolean
+negate (check S) = ((number ∪ string) ∪ nill) ∪ boolean
 negate never = unknown
 negate any = never
 negate error = unknown
@@ -53,12 +55,14 @@ negate (T ∩ U) = negate T ∪ negate U
 
 lhs : Type → Type
 lhs (T ⇒ _) = T
+lhs (check T) = T
 lhs (T ∪ _) = T
 lhs (T ∩ _) = T
 lhs T = T
 
 rhs : Type → Type
 rhs (_ ⇒ T) = T
+rhs (check T) = error
 rhs (_ ∪ T) = T
 rhs (_ ∩ T) = T
 rhs T = T
@@ -94,11 +98,13 @@ _≡ᵀ_ : ∀ (T U : Type) → Dec(T ≡ U)
 (S ⇒ T) ≡ᵀ any = no (λ ())
 (S ⇒ T) ≡ᵀ (U ∪ V) = no (λ ())
 (S ⇒ T) ≡ᵀ (U ∩ V) = no (λ ())
+(S ⇒ T) ≡ᵀ check U = no (λ ())
 any ≡ᵀ (U ⇒ V) = no (λ ())
 any ≡ᵀ never = no (λ ())
 any ≡ᵀ any = yes refl
 any ≡ᵀ (U ∪ V) = no (λ ())
 any ≡ᵀ (U ∩ V) = no (λ ())
+any ≡ᵀ check U = no (λ ())
 (S ∪ T) ≡ᵀ (U ⇒ V) = no (λ ())
 (S ∪ T) ≡ᵀ never = no (λ ())
 (S ∪ T) ≡ᵀ any = no (λ ())
@@ -107,6 +113,7 @@ any ≡ᵀ (U ∩ V) = no (λ ())
 (S ∪ T) ≡ᵀ (U ∪ V) | _ | no p = no (λ q → p (cong rhs q))
 (S ∪ T) ≡ᵀ (U ∪ V) | no p | _ = no (λ q → p (cong lhs q))
 (S ∪ T) ≡ᵀ (U ∩ V) = no (λ ())
+(S ∪ T) ≡ᵀ check U = no (λ ())
 (S ∩ T) ≡ᵀ (U ⇒ V) = no (λ ())
 (S ∩ T) ≡ᵀ never = no (λ ())
 (S ∩ T) ≡ᵀ any = no (λ ())
@@ -115,6 +122,7 @@ any ≡ᵀ (U ∩ V) = no (λ ())
 (S ∩ T) ≡ᵀ (U ∩ V) | yes refl | yes refl = yes refl
 (S ∩ T) ≡ᵀ (U ∩ V) | _ | no p = no (λ q → p (cong rhs q))
 (S ∩ T) ≡ᵀ (U ∩ V) | no p | _ = no (λ q → p (cong lhs q))
+(S ∩ T) ≡ᵀ check U = no (λ ())
 (S ⇒ T) ≡ᵀ error = no (λ ())
 never ≡ᵀ error = no (λ ())
 any ≡ᵀ error = no (λ ())
@@ -124,6 +132,7 @@ error ≡ᵀ any = no (λ ())
 error ≡ᵀ error = yes refl
 error ≡ᵀ (U ∪ V) = no (λ ())
 error ≡ᵀ (U ∩ V) = no (λ ())
+error ≡ᵀ check U = no (λ ())
 (S ∪ T) ≡ᵀ error = no (λ ())
 (S ∩ T) ≡ᵀ error = no (λ ())
 scalar T ≡ᵀ scalar U with T ≡ˢ U
@@ -135,6 +144,7 @@ scalar T ≡ᵀ any = no (λ ())
 scalar T ≡ᵀ error = no (λ ())
 scalar T  ≡ᵀ (U ∪ V) = no (λ ())
 scalar T ≡ᵀ (U ∩ V) = no (λ ())
+scalar T ≡ᵀ check U = no (λ ())
 (S ⇒ T) ≡ᵀ scalar U = no (λ ())
 never ≡ᵀ scalar U = no (λ ())
 any ≡ᵀ scalar U = no (λ ())
@@ -146,6 +156,17 @@ never ≡ᵀ never = yes refl
 never ≡ᵀ any = no (λ ())
 never ≡ᵀ (U ∪ U₁) = no (λ ())
 never ≡ᵀ (U ∩ U₁) = no (λ ())
+never ≡ᵀ check U = no (λ ())
+check T ≡ᵀ scalar U = no (λ ())
+check T ≡ᵀ (U ⇒ V) = no (λ ())
+check T ≡ᵀ check U with T ≡ᵀ U
+check T ≡ᵀ check U | yes refl = yes refl
+check T ≡ᵀ check U | no p = no (λ q → p (cong lhs q))
+check T ≡ᵀ never = no (λ ())
+check T ≡ᵀ any = no (λ ())
+check T ≡ᵀ error = no (λ ())
+check T ≡ᵀ (U ∪ V) = no (λ ())
+check T ≡ᵀ (U ∩ V) = no (λ ())
 
 _≡ᴹᵀ_ : ∀ (T U : Maybe Type) → Dec(T ≡ U)
 nothing ≡ᴹᵀ nothing = yes refl

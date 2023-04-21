@@ -1,6 +1,6 @@
 {-# OPTIONS --rewriting #-}
 
-open import Luau.Type using (Type; Scalar; nill; number; string; boolean; scalar; error; never; any; _⇒_; _∪_; _∩_)
+open import Luau.Type using (Type; Scalar; nill; number; string; boolean; scalar; error; never; any; check; _⇒_; _∪_; _∩_)
 open import Properties.Equality using (_≢_)
 
 module Luau.Subtyping where
@@ -53,6 +53,9 @@ data Language where
   function-nok : ∀ {T U t u} → (¬ALanguage T t) → Language (T ⇒ U) ⟨ t ↦ u ⟩
   function-ok : ∀ {T U t u} → (RLanguage U u) → Language (T ⇒ U) ⟨ t ↦ u ⟩
   function-warning : ∀ {T U t} → (¬Language T t) → Language (T ⇒ U) ⟨ warning t ⟩
+  check-ok : ∀ {T t u} → (ALanguage T t) → Language (check T) ⟨ t ↦ u ⟩
+  check-nok : ∀ {T t u} → (RLanguage error u) → Language (check T) ⟨ t ↦ u ⟩
+  check-warning : ∀ {T t} → Language (check T) ⟨ warning t ⟩
   left : ∀ {T U t} → Language T t → Language (T ∪ U) t
   right : ∀ {T U u} → Language U u → Language (T ∪ U) u
   _,_ : ∀ {T U t} → Language T t → Language U t → Language (T ∩ U) t
@@ -69,6 +72,9 @@ data ¬Language where
   function-function : ∀ {T U t u} → (ALanguage T t) → (¬RLanguage U u) → ¬Language (T ⇒ U) ⟨ t ↦ u ⟩
   function-warning : ∀ {T U t} → Language T t → ¬Language (T ⇒ U) ⟨ warning t ⟩
   function-error : ∀ {T U} → ¬Language (T ⇒ U) error
+  check-scalar : ∀ {S T} → ¬Language (check T) ⟨ scalar S ⟩
+  check-function : ∀ {T t u} → (¬ALanguage T t) → (¬RLanguage error u) → ¬Language (check T) ⟨ t ↦ u ⟩
+  check-error : ∀ {S} → ¬Language (check S) error
   _,_ : ∀ {T U t} → ¬Language T t → ¬Language U t → ¬Language (T ∪ U) t
   left : ∀ {T U t} → ¬Language T t → ¬Language (T ∩ U) t
   right : ∀ {T U u} → ¬Language U u → ¬Language (T ∩ U) u

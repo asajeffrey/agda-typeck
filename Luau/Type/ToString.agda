@@ -1,7 +1,7 @@
 module Luau.Type.ToString where
 
 open import FFI.Data.String using (String; _++_)
-open import Luau.Type using (Type; scalar; _⇒_; never; any; NIL; NUMBER; BOOLEAN; STRING; error; _∪_; _∩_; normalizeOptional)
+open import Luau.Type using (Type; scalar; _⇒_; never; any; check; NIL; NUMBER; BOOLEAN; STRING; error; _∪_; _∩_; normalizeOptional)
 
 {-# TERMINATING #-}
 typeToString : Type → String
@@ -9,6 +9,7 @@ typeToStringᵁ : Type → String
 typeToStringᴵ : Type → String
 
 typeToString (S ⇒ T) = "(" ++ (typeToString S) ++ ") -> " ++ (typeToString T)
+typeToString (check S) = "(" ++ (typeToString S) ++ ") -> error"
 typeToString never = "never"
 typeToString any = "any"
 typeToString (scalar NIL) = "nil"
