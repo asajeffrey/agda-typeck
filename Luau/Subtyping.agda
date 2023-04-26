@@ -17,22 +17,21 @@ data Value : Set
 data TypedValue where
 
   scalar : Scalar → TypedValue
-  warning : Value → TypedValue
   _↦_ : Arguments → Result → TypedValue
 
 data Arguments where
 
   -- For the moment just do zero-arg and one-arg functions.
   ⟨⟩ : Arguments
-  ⟨untyped⟩ : Arguments
   ⟨_⟩ : TypedValue → Arguments
 
 data Result where
 
-  -- The effects we're tracking are causing a runtime error, a typecheck warning,
+  -- The effects we're tracking are causing a runtime error, a "too few arguments" error,
   -- or diverging
   error : Result
   diverge : Result
+  arity : Result
   ⟨_⟩ : TypedValue → Result
 
 data Value where
@@ -44,18 +43,17 @@ data Language : Type → Value → Set
 data ¬Language : Type → Value → Set
 data RLanguage : Type → Result → Set
 data ¬RLanguage : Type → Result → Set
-data ALanguage : Type → Arguments → Set
-data ¬ALanguage : Type → Arguments → Set
 
 data Language where
 
   scalar : ∀ T → Language (scalar T) ⟨ scalar T ⟩
-  function-nok : ∀ {T U t u} → (¬ALanguage T t) → Language (T ⇒ U) ⟨ t ↦ u ⟩
+  function-nok : ∀ {T U t u} → (¬Language T ⟨ t ⟩) → Language (T ⇒ U) ⟨ ⟨ t ⟩ ↦ u ⟩
   function-ok : ∀ {T U t u} → (RLanguage U u) → Language (T ⇒ U) ⟨ t ↦ u ⟩
-  function-warning : ∀ {T U t} → (¬Language T t) → Language (T ⇒ U) ⟨ warning t ⟩
-  check-ok : ∀ {T t u} → (ALanguage T t) → Language (check T) ⟨ t ↦ u ⟩
-  check-nok : ∀ {T t u} → (RLanguage error u) → Language (check T) ⟨ t ↦ u ⟩
-  check-warning : ∀ {T t} → Language (check T) ⟨ warning t ⟩
+  function-arity : ∀ {T U} → ¬Language T error → Language (T ⇒ U) ⟨ ⟨⟩ ↦ arity ⟩
+  check-ok : ∀ {T t u} → (Language T ⟨ t ⟩) → Language (check T) ⟨ ⟨ t ⟩ ↦ ⟨ u ⟩ ⟩
+  check-error : ∀ {T t} → Language (check T) ⟨ ⟨ t ⟩ ↦ error ⟩
+  check-diverge : ∀ {T t} → Language (check T) ⟨ ⟨ t ⟩ ↦ diverge ⟩
+  check-arity : ∀ {T} → Language (check T) ⟨ ⟨⟩ ↦ arity ⟩
   left : ∀ {T U t} → Language T t → Language (T ∪ U) t
   right : ∀ {T U u} → Language U u → Language (T ∪ U) u
   _,_ : ∀ {T U t} → Language T t → Language U t → Language (T ∩ U) t
@@ -66,15 +64,21 @@ data ¬Language where
 
   scalar-scalar : ∀ S T → (S ≢ T) → ¬Language (scalar T) ⟨ scalar S ⟩
   scalar-function : ∀ S {t u} → ¬Language (scalar S) ⟨ t ↦ u ⟩
-  scalar-warning : ∀ {T t} → ¬Language (scalar T) ⟨ warning t ⟩
   scalar-error : ∀ S → ¬Language (scalar S) error
   function-scalar : ∀ S {T U} → ¬Language (T ⇒ U) ⟨ scalar S ⟩
-  function-function : ∀ {T U t u} → (ALanguage T t) → (¬RLanguage U u) → ¬Language (T ⇒ U) ⟨ t ↦ u ⟩
-  function-warning : ∀ {T U t} → Language T t → ¬Language (T ⇒ U) ⟨ warning t ⟩
+  function-function : ∀ {T U t u} → (Language T ⟨ t ⟩) → (¬RLanguage U u) → ¬Language (T ⇒ U) ⟨ ⟨ t ⟩ ↦ u ⟩
+  function-none : ∀ {T U t} → (¬RLanguage U ⟨ t ⟩) → ¬Language (T ⇒ U) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩
+  function-none-error : ∀ {T U} → (¬RLanguage U error) → ¬Language (T ⇒ U) ⟨ ⟨⟩ ↦ error ⟩
+  function-arity : ∀ {T U} → Language T error → ¬Language (T ⇒ U) ⟨ ⟨⟩ ↦ arity ⟩
   function-error : ∀ {T U} → ¬Language (T ⇒ U) error
   check-scalar : ∀ {S T} → ¬Language (check T) ⟨ scalar S ⟩
-  check-function : ∀ {T t u} → (¬ALanguage T t) → (¬RLanguage error u) → ¬Language (check T) ⟨ t ↦ u ⟩
-  check-error : ∀ {S} → ¬Language (check S) error
+  check-error : ∀ {T} → ¬Language (check T) error
+  check-ok : ∀ {T t u} → (¬Language T ⟨ t ⟩) → ¬Language (check T) ⟨ ⟨ t ⟩ ↦ ⟨ u ⟩ ⟩
+  check-nok : ∀ {T} → ¬Language (check T) ⟨ ⟨⟩ ↦ error ⟩
+  check-diverge : ∀ {T} → ¬Language (check T) ⟨ ⟨⟩ ↦ diverge ⟩
+  check-arity : ∀ {T t} → ¬Language (check T) ⟨ ⟨ t ⟩ ↦ arity ⟩
+  check-none : ∀ {T t} → ¬Language (check T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩
+  check-none-error : ∀ {T} → ¬Language (check T) ⟨ ⟨⟩ ↦ error ⟩
   _,_ : ∀ {T U t} → ¬Language T t → ¬Language U t → ¬Language (T ∪ U) t
   left : ∀ {T U t} → ¬Language T t → ¬Language (T ∩ U) t
   right : ∀ {T U u} → ¬Language U u → ¬Language (T ∩ U) u
@@ -90,18 +94,8 @@ data RLanguage where
 data ¬RLanguage where
 
   error : ∀ {T} → ¬Language T error → ¬RLanguage T error
+  arity : ∀ {T} → ¬RLanguage T arity
   one : ∀ {T t} → ¬Language T ⟨ t ⟩ → ¬RLanguage T ⟨ t ⟩
-
-data ALanguage where
-
-  none : ∀ {T} → ALanguage T ⟨⟩
-  untyped : ∀ {T} → Language T error → ALanguage T ⟨untyped⟩
-  one : ∀ {T t} → Language T ⟨ t ⟩ → ALanguage T ⟨ t ⟩
-
-data ¬ALanguage where
-
-  untyped : ∀ {T} → ¬Language T error → ¬ALanguage T ⟨untyped⟩
-  one : ∀ {T t} → ¬Language T ⟨ t ⟩ → ¬ALanguage T ⟨ t ⟩
 
 -- Subtyping as language inclusion
 

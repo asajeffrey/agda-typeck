@@ -30,7 +30,7 @@ string = scalar STRING
 nill = scalar NIL
 
 -- Top function type
-funktion = (never ⇒ any) ∩ (check any)
+funktion = (never ⇒ any)
 
 -- Top non-error type
 unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
