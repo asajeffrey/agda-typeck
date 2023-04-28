@@ -55,9 +55,9 @@ data Language where
   function-nok : ∀ {T U t u} → (¬Language T ⟨ t ⟩) → Language (T ⇒ U) ⟨ ⟨ t ⟩ ↦ u ⟩
   function-ok : ∀ {T U t u} → (RLanguage U u) → Language (T ⇒ U) ⟨ t ↦ u ⟩
   function-arity : ∀ {T U} → (¬Language T error) → Language (T ⇒ U) ⟨ ⟨⟩ ↦ blame caller ⟩
-  -- check-ok : ∀ {T t u} → (ALanguage T t) → Language (check T) ⟨ t ↦ u ⟩
-  -- check-nok : ∀ {T t} → Language (check T) ⟨ ⟨ t ⟩ ↦ error ⟩
-  -- check-arity : ∀ {T} → Language (check T) ⟨ ⟨⟩ ↦ arity ⟩
+  check-ok : ∀ {T t u} → (Language T ⟨ t ⟩) → Language (check T) ⟨ ⟨ t ⟩ ↦ u ⟩
+  check-nok : ∀ {T t} → Language (check T) ⟨ t ↦ blame caller ⟩
+  check-arity : ∀ {T u} → (Language T error) → Language (check T) ⟨ ⟨⟩ ↦ u ⟩
   left : ∀ {T U t} → Language T t → Language (T ∪ U) t
   right : ∀ {T U u} → Language U u → Language (T ∪ U) u
   _,_ : ∀ {T U t} → Language T t → Language U t → Language (T ∩ U) t
@@ -74,10 +74,10 @@ data ¬Language where
   function-one : ∀ {T U t u} → (Language T ⟨ t ⟩) → (¬RLanguage U u) → ¬Language (T ⇒ U) ⟨ ⟨ t ⟩ ↦ u ⟩
   function-none : ∀ {T U u} → (u ≢ blame caller) → (¬RLanguage U u) → ¬Language (T ⇒ U) ⟨ ⟨⟩ ↦ u ⟩
   function-arity : ∀ {T U} → (Language T error) → ¬Language (T ⇒ U) ⟨ ⟨⟩ ↦ blame caller ⟩
-  -- check-scalar : ∀ {S T} → ¬Language (check T) ⟨ scalar S ⟩
-  -- check-error : ∀ {T} → ¬Language (check T) error
-  -- check-one : ∀ {T t u} → (u ≢ error) → (¬Language T ⟨ t ⟩) → ¬Language (check T) ⟨ ⟨ t ⟩ ↦ u ⟩
-  -- check-none : ∀ {T u} → (u ≢ arity) → ¬Language (check T) ⟨ ⟨⟩ ↦ u ⟩
+  check-scalar : ∀ {S T} → ¬Language (check T) ⟨ scalar S ⟩
+  check-error : ∀ {T} → ¬Language (check T) error
+  check-one : ∀ {T t u} → (u ≢ blame caller) → (¬Language T ⟨ t ⟩) → ¬Language (check T) ⟨ ⟨ t ⟩ ↦ u ⟩
+  check-none : ∀ {T u} → (u ≢ blame caller) → (¬Language T error) → ¬Language (check T) ⟨ ⟨⟩ ↦ u ⟩
   _,_ : ∀ {T U t} → ¬Language T t → ¬Language U t → ¬Language (T ∪ U) t
   left : ∀ {T U t} → ¬Language T t → ¬Language (T ∩ U) t
   right : ∀ {T U u} → ¬Language U u → ¬Language (T ∩ U) u

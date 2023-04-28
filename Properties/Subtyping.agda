@@ -5,7 +5,7 @@ module Properties.Subtyping where
 open import Agda.Builtin.Equality using (_≡_; refl)
 open import FFI.Data.Either using (Either; Left; Right; mapLR; swapLR; cond)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
-open import Luau.Subtyping using (_<:_; _≮:_; Value; Language; ¬Language; RLanguage; ¬RLanguage; witness; any; never; scalar; scalar-function; scalar-scalar; scalar-error; function-scalar; function-ok; function-nok; function-error; function-none; function-one; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; one; function-arity; blame; caller; callee)
+open import Luau.Subtyping using (_<:_; _≮:_; Value; Language; ¬Language; RLanguage; ¬RLanguage; witness; any; never; scalar; scalar-function; scalar-scalar; scalar-error; function-scalar; function-ok; function-nok; function-error; function-none; function-one; check-one; check-none; check-arity; check-ok; check-nok; check-error; check-scalar; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; one; function-arity; blame; caller; callee)
 open import Luau.Type using (Type; Scalar; scalar; error; never; unknown; funktion; negate; check; _⇒_; _∪_; _∩_; any; number; string; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_)
 open import Properties.Contradiction using (CONTRADICTION; ¬; ⊥)
 open import Properties.Dec using (Dec; yes; no)
@@ -35,14 +35,16 @@ dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame caller ⟩ = cond (Right ∘ functio
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame callee ⟩ = mapLR (function-none (λ ()) ∘ callee) (function-ok ∘ callee) (dec-language T error)
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ diverge ⟩ = Right (function-ok diverge)
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (function-none (λ ())) function-ok (dec-rlanguage T ⟨ t ⟩)
-dec-language (check S) t = {!!}
--- dec-language (check S) error = Left check-error
--- dec-language (check S) ⟨ scalar s ⟩ = Left check-scalar
--- dec-language (check S) ⟨ ⟨⟩ ↦ error ⟩ = Left (check-none (λ ()))
--- dec-language (check S) ⟨ ⟨⟩ ↦ diverge ⟩ = Left (check-none (λ ()))
--- dec-language (check S) ⟨ ⟨⟩ ↦ arity ⟩ = Right check-arity
--- dec-language (check S) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = Left (check-none (λ ()))
--- dec-language (check S) ⟨ ⟨ s ⟩ ↦ t ⟩ = {!!}
+dec-language (check T) error = Left check-error
+dec-language (check T) ⟨ scalar S ⟩ = Left check-scalar
+dec-language (check T) ⟨ ⟨⟩ ↦ blame callee ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
+dec-language (check T) ⟨ ⟨⟩ ↦ blame caller ⟩ = Right check-nok
+dec-language (check T) ⟨ ⟨⟩ ↦ diverge ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
+dec-language (check T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame callee ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame caller ⟩ = Right check-nok
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ diverge ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
 
 dec-rlanguage T diverge = Right diverge
 dec-rlanguage T ⟨ t ⟩ = mapLR one one (dec-language T ⟨ t ⟩)
@@ -63,10 +65,10 @@ language-comp (function-none p₁ (callee p₂)) (function-ok (callee q)) = lang
 language-comp (function-none p₁ (one p₂)) (function-ok (one q)) = language-comp p₂ q
 language-comp (function-none p₁ p₂) (function-arity q) = p₁ refl
 language-comp (function-arity p) (function-arity q) = language-comp q p
--- language-comp (check-one p₁ p₂) (check-ok q) = {!!}
--- language-comp (check-one p₁ p₂) check-nok = p₁ refl
--- language-comp (check-none p) check-arity = p refl
--- language-comp (check-none x) q = {!!}
+language-comp (check-one p₁ p₂) (check-ok q) = language-comp p₂ q
+language-comp (check-one p₁ p₂) check-nok = p₁ refl
+language-comp (check-none p₁ p₂) check-nok = p₁ refl
+language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 
 -- ≮: is the complement of <:
 ¬≮:-impl-<: : ∀ {T U} → ¬(T ≮: U) → (T <: U)
@@ -315,48 +317,48 @@ error-≮:-function = witness error function-error
 
 -- Properties of check functions
 <:-check : ∀ {S T} → S <: T → check S <: check T
--- <:-check p (check-ok q) = {!!} -- check-ok (p q)
--- <:-check p check-error = check-error
--- <:-check p check-diverge = check-diverge
--- <:-check p check-arity = check-arity
+<:-check p (check-ok q) = check-ok (p q)
+<:-check p check-nok = check-nok
+<:-check p (check-arity q) = check-arity (p q)
 
 <:-check-dist-∪ : ∀ {S T} → check (S ∪ T) <: (check(S) ∪ check(T))
--- <:-check-dist-∪ (check-ok (left p)) = left (check-ok p)
--- <:-check-dist-∪ (check-ok (right p)) = right (check-ok p)
--- <:-check-dist-∪ check-error = left check-error
--- <:-check-dist-∪ check-diverge = left check-diverge
--- <:-check-dist-∪ check-arity = left check-arity
+<:-check-dist-∪ (check-ok (left p)) = left (check-ok p)
+<:-check-dist-∪ (check-ok (right p)) = right (check-ok p)
+<:-check-dist-∪ check-nok = left check-nok
+<:-check-dist-∪ (check-arity (left p)) = left (check-arity p)
+<:-check-dist-∪ (check-arity (right p)) = right (check-arity p)
 
 check-dist-∪-<: : ∀ {S T} → (check(S) ∪ check(T)) <: check (S ∪ T)
--- check-dist-∪-<: (left (check-ok p)) = check-ok (left p)
--- check-dist-∪-<: (left check-error) = check-error
--- check-dist-∪-<: (left check-diverge) = check-diverge
--- check-dist-∪-<: (left check-arity) = check-arity
--- check-dist-∪-<: (right (check-ok p)) = check-ok (right p)
--- check-dist-∪-<: (right check-error) = check-error
--- check-dist-∪-<: (right check-diverge) = check-diverge
--- check-dist-∪-<: (right check-arity) = check-arity
+check-dist-∪-<: (left (check-ok p)) = check-ok (left p)
+check-dist-∪-<: (left check-nok) = check-nok
+check-dist-∪-<: (left (check-arity p)) = check-arity (left p)
+check-dist-∪-<: (right (check-ok p)) = check-ok (right p)
+check-dist-∪-<: (right check-nok) = check-nok
+check-dist-∪-<: (right (check-arity p)) = check-arity (right p)
 
 <:-check-dist-∩ : ∀ {S T} → check (S ∩ T) <: (check(S) ∩ check(T))
--- <:-check-dist-∩ (check-ok (p , q)) = (check-ok p , check-ok q)
--- <:-check-dist-∩ check-error = (check-error , check-error)
--- <:-check-dist-∩ check-diverge = (check-diverge , check-diverge)
--- <:-check-dist-∩ check-arity = (check-arity , check-arity)
+<:-check-dist-∩ (check-ok (p , q)) = (check-ok p , check-ok q)
+<:-check-dist-∩ check-nok = (check-nok , check-nok)
+<:-check-dist-∩ (check-arity (p , q)) = (check-arity p , check-arity q)
 
 check-dist-∩-<: : ∀ {S T} → (check(S) ∩ check(T)) <: check (S ∩ T)
--- check-dist-∩-<: (check-ok p , check-ok q) = check-ok (p , q)
--- check-dist-∩-<: (check-error , q) = check-error
--- check-dist-∩-<: (check-diverge , q) = check-diverge
--- check-dist-∩-<: (check-arity , q) = check-arity
+check-dist-∩-<: (check-ok p , check-ok q) = check-ok (p , q)
+check-dist-∩-<: (p , check-nok) = check-nok
+check-dist-∩-<: (check-nok , q) = check-nok
+check-dist-∩-<: (check-arity p , check-arity q) = check-arity (p , q)
 
 function-<:-check : ∀ {S T} → (S ⇒ T) <: (check any)
--- function-<:-check {t = ⟨ ⟨⟩ ↦ error ⟩} (function-ok (error p)) = ? -- check-ok (ALanguage.none any)
--- function-<:-check {t = ⟨ ⟨⟩ ↦ diverge ⟩} p = ? -- check-ok (ALanguage.none any)
--- function-<:-check {t = ⟨ ⟨⟩ ↦ arity ⟩} p = check-arity
--- function-<:-check {t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} p = check-ok (ALanguage.none any)
--- function-<:-check {t = ⟨ ⟨ s ⟩ ↦ error ⟩} p = check-error
--- function-<:-check {t = ⟨ ⟨ s ⟩ ↦ diverge ⟩} p = check-ok any -- check-diverge
--- function-<:-check {t = ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩} p = check-ok any
+function-<:-check {t = ⟨ ⟨⟩ ↦ blame callee ⟩} (function-ok p) = check-arity any
+function-<:-check {t = ⟨ ⟨⟩ ↦ blame caller ⟩} (function-arity p) = check-nok
+function-<:-check {t = ⟨ ⟨⟩ ↦ diverge ⟩} (function-ok p) = check-arity any
+function-<:-check {t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} (function-ok p) = check-arity any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame callee ⟩} (function-nok p) = check-ok any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame callee ⟩} (function-ok p) = check-ok any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame caller ⟩} (function-nok p) = check-nok
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ diverge ⟩} (function-nok p) = check-ok any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ diverge ⟩} (function-ok p) = check-ok any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩} (function-nok p) = check-ok any
+function-<:-check {t = ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩} (function-ok p) = check-ok any
 
 -- Properties of scalars
 scalar-<: : ∀ S {T} → Language T ⟨ scalar S ⟩ → (scalar S <: T)
