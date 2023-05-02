@@ -4,6 +4,7 @@ open import FFI.Data.Maybe using (Maybe; just; nothing; just-inv)
 open import Agda.Builtin.Equality using (_≡_; refl)
 open import Properties.Dec using (Dec; yes; no)
 open import Properties.Equality using (cong)
+open import Properties.Functions using (_∘_)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
 
 data Scalar : Set where
@@ -13,27 +14,50 @@ data Scalar : Set where
   STRING : Scalar
   NIL : Scalar
 
+data Test : Set where
+
+  scalar : Scalar → Test
+  function : Test
+  never : Test
+  _∪_ : Test → Test → Test
+
 data Type : Set where
 
   scalar : Scalar → Type
   _⇒_ : Type → Type → Type
-  check : Type → Type
+  check : Test → Type
   never : Type
   any : Type
   error : Type
   _∪_ : Type → Type → Type
   _∩_ : Type → Type → Type
 
+number : Type
 number = scalar NUMBER
+
+boolean : Type
 boolean = scalar BOOLEAN
+
+string : Type
 string = scalar STRING
+
+nill : Type
 nill = scalar NIL
 
 -- Top function type
+funktion : Type
 funktion = (never ⇒ any)
 
 -- Top non-error type
+unknown : Type
 unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
+
+-- Covert testable types to types
+⌊_⌋ : Test → Type
+⌊ scalar s ⌋ = scalar s
+⌊ function ⌋ = funktion
+⌊ never ⌋ = never
+⌊ T ∪ U ⌋ = ⌊ T ⌋ ∪ ⌊ U ⌋
 
 -- Negated scalar types
 negateScalar : Scalar → Type
@@ -43,26 +67,24 @@ negateScalar STRING = ((funktion ∪ number) ∪ nill) ∪ boolean
 negateScalar NIL = ((funktion ∪ number) ∪ string) ∪ boolean
 
 -- Negated testable types
-negate : Type → Type
+negate : Test → Type
 negate (scalar S) = negateScalar S
-negate (T ⇒ U) = ((number ∪ string) ∪ nill) ∪ boolean
-negate (check S) = ((number ∪ string) ∪ nill) ∪ boolean
-negate never = unknown
-negate any = never
-negate error = unknown
+negate function = ((number ∪ string) ∪ nill) ∪ boolean
+negate never = any
 negate (T ∪ U) = negate T ∩ negate U
-negate (T ∩ U) = negate T ∪ negate U
+
+-- Subtraction of a testable type from a type
+_\\_ : Type → Test → Type
+S \\ T = S ∩ negate T
 
 lhs : Type → Type
 lhs (T ⇒ _) = T
-lhs (check T) = T
 lhs (T ∪ _) = T
 lhs (T ∩ _) = T
 lhs T = T
 
 rhs : Type → Type
 rhs (_ ⇒ T) = T
-rhs (check T) = error
 rhs (_ ∪ T) = T
 rhs (_ ∩ T) = T
 rhs T = T
@@ -70,6 +92,10 @@ rhs T = T
 unscalar : Type → Scalar
 unscalar (scalar T) = T
 unscalar T = NIL
+
+uncheck : Type → Test
+uncheck (check T) = T
+uncheck T = never
 
 _≡ˢ_ : ∀ (T U : Scalar) → Dec(T ≡ U)
 NUMBER ≡ˢ NUMBER = yes refl
@@ -88,6 +114,29 @@ NIL ≡ˢ NUMBER = no (λ ())
 NIL ≡ˢ BOOLEAN = no (λ ())
 NIL ≡ˢ STRING = no (λ ())
 NIL ≡ˢ NIL = yes refl
+
+_≡ᵀᵀ_ : ∀ (T U : Test) → Dec(T ≡ U)
+scalar S ≡ᵀᵀ scalar T with S ≡ˢ T
+(scalar S ≡ᵀᵀ scalar .S) | yes refl = yes refl
+(scalar S ≡ᵀᵀ scalar T) | no p = no (λ { refl → p refl })
+scalar S ≡ᵀᵀ function = no (λ ())
+scalar S ≡ᵀᵀ never = no (λ ())
+scalar S ≡ᵀᵀ (T ∪ U) = no (λ ())
+function ≡ᵀᵀ scalar T = no (λ ())
+function ≡ᵀᵀ function = yes refl
+function ≡ᵀᵀ never = no (λ ())
+function ≡ᵀᵀ (T ∪ U) = no (λ ())
+never ≡ᵀᵀ scalar T = no (λ ())
+never ≡ᵀᵀ function = no (λ ())
+never ≡ᵀᵀ never = yes refl
+never ≡ᵀᵀ (T ∪ U) = no (λ ())
+(S ∪ T) ≡ᵀᵀ scalar U = no (λ ())
+(S ∪ T) ≡ᵀᵀ function = no (λ ())
+(S ∪ T) ≡ᵀᵀ never = no (λ ())
+(S ∪ T) ≡ᵀᵀ (U ∪ V) with (S ≡ᵀᵀ U) | (T ≡ᵀᵀ V) 
+(S ∪ T) ≡ᵀᵀ (S ∪ T) | yes refl | yes refl = yes refl
+(S ∪ T) ≡ᵀᵀ (U ∪ V) | _ | no p = no (λ { refl → p refl })
+(S ∪ T) ≡ᵀᵀ (U ∪ V) | no p | _ = no (λ { refl → p refl })
 
 _≡ᵀ_ : ∀ (T U : Type) → Dec(T ≡ U)
 (S ⇒ T) ≡ᵀ (U ⇒ V) with (S ≡ᵀ U) | (T ≡ᵀ V) 
@@ -159,9 +208,9 @@ never ≡ᵀ (U ∩ U₁) = no (λ ())
 never ≡ᵀ check U = no (λ ())
 check T ≡ᵀ scalar U = no (λ ())
 check T ≡ᵀ (U ⇒ V) = no (λ ())
-check T ≡ᵀ check U with T ≡ᵀ U
+check T ≡ᵀ check U with T ≡ᵀᵀ U
 check T ≡ᵀ check U | yes refl = yes refl
-check T ≡ᵀ check U | no p = no (λ q → p (cong lhs q))
+check T ≡ᵀ check U | no p = no (λ q → p (cong uncheck q))
 check T ≡ᵀ never = no (λ ())
 check T ≡ᵀ any = no (λ ())
 check T ≡ᵀ error = no (λ ())

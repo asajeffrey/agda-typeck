@@ -5,8 +5,8 @@ module Properties.Subtyping where
 open import Agda.Builtin.Equality using (_≡_; refl)
 open import FFI.Data.Either using (Either; Left; Right; mapLR; swapLR; cond)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
-open import Luau.Subtyping using (_<:_; _≮:_; Value; Language; ¬Language; RLanguage; ¬RLanguage; witness; any; never; scalar; scalar-function; scalar-scalar; scalar-error; function-scalar; function-ok; function-nok; function-error; function-none; function-one; check-one; check-none; check-arity; check-ok; check-nok; check-error; check-scalar; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; one; function-arity; blame; caller; callee)
-open import Luau.Type using (Type; Scalar; scalar; error; never; unknown; funktion; negate; check; _⇒_; _∪_; _∩_; any; number; string; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_)
+open import Luau.Subtyping using (_<:_; _≮:_; Value; Language; ¬Language; RLanguage; ¬RLanguage; witness; any; never; scalar; scalar-function; scalar-scalar; scalar-error; function-scalar; function-ok; function-nok; function-error; function-none; function-one; check-one; check-none; check-ok; check-nok; check-error; check-scalar; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; one; function-arity; blame; caller; callee; suppression)
+open import Luau.Type using (Type; Scalar; scalar; error; never; unknown; funktion; negate; check; _⇒_; _∪_; _∩_; any; number; string; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; ⌊_⌋; _\\_)
 open import Properties.Contradiction using (CONTRADICTION; ¬; ⊥)
 open import Properties.Dec using (Dec; yes; no)
 open import Properties.Equality using (_≢_)
@@ -32,24 +32,28 @@ dec-language (S ⇒ T) error = Left function-error
 dec-language (S ⇒ T) ⟨ scalar s ⟩ = Left (function-scalar s)
 dec-language (S ⇒ T) ⟨ ⟨ s ⟩ ↦ t ⟩ = cond (Right ∘ function-nok) (λ p → mapLR (function-one p) function-ok (dec-rlanguage T t)) (dec-language S ⟨ s ⟩)
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame caller ⟩ = cond (Right ∘ function-arity) (Left ∘ function-arity) (dec-language S error)
-dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame callee ⟩ = mapLR (function-none (λ ()) ∘ callee) (function-ok ∘ callee) (dec-language T error)
+dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame callee ⟩ = Right (function-ok callee)
+dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ blame suppression ⟩ = mapLR (function-none (λ ()) ∘ suppression) (function-ok ∘ suppression) (dec-language T error)
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ diverge ⟩ = Right (function-ok diverge)
 dec-language (S ⇒ T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (function-none (λ ())) function-ok (dec-rlanguage T ⟨ t ⟩)
 dec-language (check T) error = Left check-error
 dec-language (check T) ⟨ scalar S ⟩ = Left check-scalar
-dec-language (check T) ⟨ ⟨⟩ ↦ blame callee ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
-dec-language (check T) ⟨ ⟨⟩ ↦ blame caller ⟩ = Right check-nok
-dec-language (check T) ⟨ ⟨⟩ ↦ diverge ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
-dec-language (check T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (check-none (λ ())) check-arity (dec-language T error)
-dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame callee ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
-dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame caller ⟩ = Right check-nok
-dec-language (check T) ⟨ ⟨ s ⟩ ↦ diverge ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
-dec-language (check T) ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (check-one (λ ())) check-ok (dec-language T ⟨ s ⟩)
+dec-language (check T) ⟨ ⟨⟩ ↦ blame callee ⟩ = Right check-nok
+dec-language (check T) ⟨ ⟨⟩ ↦ blame caller ⟩ = Left (check-none (λ ()))
+dec-language (check T) ⟨ ⟨⟩ ↦ blame suppression ⟩ = Left (check-none (λ ()))
+dec-language (check T) ⟨ ⟨⟩ ↦ diverge ⟩ = Left (check-none (λ ()))
+dec-language (check T) ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ = Left (check-none (λ ()))
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame callee ⟩ = Right check-nok
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame caller ⟩ = {!!}
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ blame suppression ⟩ = {!!}
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ diverge ⟩ = mapLR (check-one (λ ())) check-ok (dec-language ⌊ T ⌋ ⟨ s ⟩)
+dec-language (check T) ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩ = mapLR (check-one (λ ())) check-ok (dec-language ⌊ T ⌋ ⟨ s ⟩)
 
 dec-rlanguage T diverge = Right diverge
 dec-rlanguage T ⟨ t ⟩ = mapLR one one (dec-language T ⟨ t ⟩)
-dec-rlanguage T (blame callee) = mapLR callee callee (dec-language T error)
 dec-rlanguage T (blame caller) = Left caller
+dec-rlanguage T (blame callee) = Right callee
+dec-rlanguage T (blame suppression) = mapLR suppression suppression (dec-language T error)
 
 -- ¬Language T is the complement of Language T
 language-comp : ∀ {T t} → ¬Language T t → ¬(Language T t)
@@ -59,16 +63,16 @@ language-comp (left p) (q₁ , q₂) = language-comp p q₁
 language-comp (right p) (q₁ , q₂) = language-comp p q₂
 language-comp (scalar-scalar s p₁ p₂) (scalar s) = p₂ refl
 language-comp (function-one p₁ p₂) (function-nok q) = language-comp q p₁
-language-comp (function-one p₁ (callee p₂)) (function-ok (callee q)) = language-comp p₂ q
+-- language-comp (function-one p₁ (callee p₂)) (function-ok (callee q)) = language-comp p₂ q
 language-comp (function-one p₁ (one p₂)) (function-ok (one q)) = language-comp p₂ q
-language-comp (function-none p₁ (callee p₂)) (function-ok (callee q)) = language-comp p₂ q
+-- language-comp (function-none p₁ (callee p₂)) (function-ok (callee q)) = language-comp p₂ q
 language-comp (function-none p₁ (one p₂)) (function-ok (one q)) = language-comp p₂ q
 language-comp (function-none p₁ p₂) (function-arity q) = p₁ refl
 language-comp (function-arity p) (function-arity q) = language-comp q p
 language-comp (check-one p₁ p₂) (check-ok q) = language-comp p₂ q
 language-comp (check-one p₁ p₂) check-nok = p₁ refl
-language-comp (check-none p₁ p₂) check-nok = p₁ refl
-language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
+language-comp (check-none p) check-nok = p refl
+-- language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 
 -- ≮: is the complement of <:
 ¬≮:-impl-<: : ∀ {T U} → ¬(T ≮: U) → (T <: U)
@@ -232,14 +236,14 @@ language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 <:-function : ∀ {R S T U} → (R <: S) → (T <: U) → (S ⇒ T) <: (R ⇒ U)
 <:-function p q (function-ok diverge) = function-ok diverge
 <:-function p q (function-ok (one r)) = function-ok (one (q r))
-<:-function p q (function-ok (callee r)) = function-ok (callee (q r))
+-- <:-function p q (function-ok (callee r)) = function-ok (callee (q r))
 <:-function p q (function-nok r) = function-nok (<:-impl-⊇ p r)
 <:-function p q (function-arity r) = function-arity (<:-impl-⊇ p r)
 
 <:-function-∩-∩ : ∀ {R S T U} → ((R ⇒ T) ∩ (S ⇒ U)) <: ((R ∩ S) ⇒ (T ∩ U))
 <:-function-∩-∩ (p , function-ok diverge) = function-ok diverge
 <:-function-∩-∩ (function-ok (one p) , function-ok (one q)) = function-ok (one (p , q))
-<:-function-∩-∩ (function-ok (callee p) , function-ok (callee q)) = function-ok (callee (p , q))
+-- <:-function-∩-∩ (function-ok (callee p) , function-ok (callee q)) = function-ok (callee (p , q))
 <:-function-∩-∩ (function-nok p , q) = function-nok (left p)
 <:-function-∩-∩ (p , function-nok q) = function-nok (right q)
 <:-function-∩-∩ (function-arity p , q) = function-arity (left p)
@@ -249,15 +253,15 @@ language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 <:-function-∩-∪ (p , function-ok (one q)) = function-ok (one (right q))
 <:-function-∩-∪ (function-ok diverge , q) = function-ok diverge
 <:-function-∩-∪ (function-ok (one p) , q) = function-ok (one (left p))
-<:-function-∩-∪ (function-ok (callee p) , q) = function-ok (callee (left p))
+-- <:-function-∩-∪ (function-ok (callee p) , q) = function-ok (callee (left p))
 <:-function-∩-∪ (function-nok p , function-nok q) = function-nok (p , q)
-<:-function-∩-∪ (function-nok p , function-ok (callee q)) = function-ok (callee (right q))
+-- <:-function-∩-∪ (function-nok p , function-ok (callee q)) = function-ok (callee (right q))
 <:-function-∩-∪ (function-arity p , function-arity q) = function-arity (p , q)
 
 <:-function-∩ : ∀ {S T U} → ((S ⇒ T) ∩ (S ⇒ U)) <: (S ⇒ (T ∩ U))
 <:-function-∩ (function-ok diverge , q) = function-ok diverge
 <:-function-∩ (function-ok (one p) , function-ok (one q)) = function-ok (one (p , q))
-<:-function-∩ (function-ok (callee p) , function-ok (callee q)) = function-ok (callee (p , q))
+-- <:-function-∩ (function-ok (callee p) , function-ok (callee q)) = function-ok (callee (p , q))
 <:-function-∩ (function-nok p , q) = function-nok p
 <:-function-∩ (p , function-nok q) = function-nok q
 <:-function-∩ (function-arity p , q) = function-arity p
@@ -265,12 +269,12 @@ language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 <:-function-∪ : ∀ {R S T U} → ((R ⇒ S) ∪ (T ⇒ U)) <: ((R ∩ T) ⇒ (S ∪ U))
 <:-function-∪ (left (function-ok diverge)) = function-ok diverge
 <:-function-∪ (left (function-ok (one p))) = function-ok (one (left p))
-<:-function-∪ (left (function-ok (callee p))) = function-ok (callee (left p))
+-- <:-function-∪ (left (function-ok (callee p))) = function-ok (callee (left p))
 <:-function-∪ (left (function-nok p)) = function-nok (left p)
 <:-function-∪ (left (function-arity p)) = function-arity (left p)
 <:-function-∪ (right (function-ok diverge)) = function-ok diverge
 <:-function-∪ (right (function-ok (one p))) = function-ok (one (right p))
-<:-function-∪ (right (function-ok (callee p))) = function-ok (callee (right p))
+-- <:-function-∪ (right (function-ok (callee p))) = function-ok (callee (right p))
 <:-function-∪ (right (function-nok p)) = function-nok (right p)
 <:-function-∪ (right (function-arity p)) = function-arity (right p)
 
@@ -278,8 +282,8 @@ language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 <:-function-∪-∩ (function-ok diverge) = left (function-ok diverge)
 <:-function-∪-∩ (function-ok (one (left p))) = left (function-ok (one p))
 <:-function-∪-∩ (function-ok (one (right p))) = right (function-ok (one p))
-<:-function-∪-∩ (function-ok (callee (left p))) = left (function-ok (callee p))
-<:-function-∪-∩ (function-ok (callee (right p))) = right (function-ok (callee p))
+-- <:-function-∪-∩ (function-ok (callee (left p))) = left (function-ok (callee p))
+-- <:-function-∪-∩ (function-ok (callee (right p))) = right (function-ok (callee p))
 <:-function-∪-∩ (function-nok (left p)) = left (function-nok p)
 <:-function-∪-∩ (function-nok (right p)) = right (function-nok p)
 <:-function-∪-∩ (function-arity (left p)) = left (function-arity p)
@@ -293,17 +297,17 @@ language-comp (check-none p₁ p₂) (check-arity q) = language-comp p₂ q
 <:-function-left {R} {S} p {⟨ s ⟩} Rs | function-one Ss caller = Ss
 
 <:-function-right : ∀ {R S T U} → (S ⇒ T) <: (R ⇒ U) → (T <: U)
-<:-function-right p {error} Te with p {t = ⟨ ⟨⟩ ↦ blame callee ⟩} (function-ok (callee Te))
-<:-function-right p {error} Te | function-ok (callee Ue) = Ue
-<:-function-right p {⟨ t ⟩} Tt with p { t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ } (function-ok (one Tt))
-<:-function-right p {⟨ t ⟩} Tt | function-ok (one Ut) = Ut
+-- <:-function-right p {error} Te with p {t = ⟨ ⟨⟩ ↦ blame callee ⟩} (function-ok (callee Te))
+-- <:-function-right p {error} Te | function-ok (callee Ue) = Ue
+-- <:-function-right p {⟨ t ⟩} Tt with p { t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩ } (function-ok (one Tt))
+-- <:-function-right p {⟨ t ⟩} Tt | function-ok (one Ut) = Ut
 
 ≮:-function-left : ∀ {R S T U} → (R ≮: S) → (S ⇒ T) ≮: (R ⇒ U)
 ≮:-function-left (witness {error} p q) = witness {t = ⟨ ⟨⟩ ↦ blame caller ⟩} (function-arity q) (function-arity p)
 ≮:-function-left (witness {⟨ s ⟩} p q) = witness {t = ⟨ ⟨ s ⟩ ↦ blame caller ⟩} (function-nok q) (function-one p caller)
 
 ≮:-function-right : ∀ {R S T U} → (T ≮: U) → (S ⇒ T) ≮: (R ⇒ U)
-≮:-function-right (witness {error} p q) = witness { t = ⟨ ⟨⟩ ↦ blame callee ⟩ } (function-ok (callee p)) (function-none (λ ()) (callee q))
+≮:-function-right (witness {error} p q) = witness { t = ⟨ ⟨⟩ ↦ blame suppression ⟩ } (function-ok (suppression p)) (function-none (λ ()) (suppression q))
 ≮:-function-right (witness {⟨ s ⟩} p q) = witness { t = ⟨ ⟨⟩ ↦ ⟨ s ⟩ ⟩ } (function-ok (one p)) (function-none (λ ()) (one q))
 
 function-<:-funktion : ∀ {S T} → (S ⇒ T) <: funktion
@@ -316,49 +320,50 @@ error-≮:-function : ∀ {S T} → error ≮: (S ⇒ T)
 error-≮:-function = witness error function-error
 
 -- Properties of check functions
-<:-check : ∀ {S T} → S <: T → check S <: check T
+<:-check : ∀ {S T} → ⌊ S ⌋ <: ⌊ T ⌋ → check S <: check T
 <:-check p (check-ok q) = check-ok (p q)
 <:-check p check-nok = check-nok
-<:-check p (check-arity q) = check-arity (p q)
+-- <:-check p (check-arity q) = check-arity (p q)
 
 <:-check-dist-∪ : ∀ {S T} → check (S ∪ T) <: (check(S) ∪ check(T))
 <:-check-dist-∪ (check-ok (left p)) = left (check-ok p)
 <:-check-dist-∪ (check-ok (right p)) = right (check-ok p)
 <:-check-dist-∪ check-nok = left check-nok
-<:-check-dist-∪ (check-arity (left p)) = left (check-arity p)
-<:-check-dist-∪ (check-arity (right p)) = right (check-arity p)
+-- <:-check-dist-∪ (check-arity (left p)) = left (check-arity p)
+-- <:-check-dist-∪ (check-arity (right p)) = right (check-arity p)
 
 check-dist-∪-<: : ∀ {S T} → (check(S) ∪ check(T)) <: check (S ∪ T)
 check-dist-∪-<: (left (check-ok p)) = check-ok (left p)
 check-dist-∪-<: (left check-nok) = check-nok
-check-dist-∪-<: (left (check-arity p)) = check-arity (left p)
+-- check-dist-∪-<: (left (check-arity p)) = check-arity (left p)
 check-dist-∪-<: (right (check-ok p)) = check-ok (right p)
 check-dist-∪-<: (right check-nok) = check-nok
-check-dist-∪-<: (right (check-arity p)) = check-arity (right p)
+-- check-dist-∪-<: (right (check-arity p)) = check-arity (right p)
 
-<:-check-dist-∩ : ∀ {S T} → check (S ∩ T) <: (check(S) ∩ check(T))
-<:-check-dist-∩ (check-ok (p , q)) = (check-ok p , check-ok q)
-<:-check-dist-∩ check-nok = (check-nok , check-nok)
-<:-check-dist-∩ (check-arity (p , q)) = (check-arity p , check-arity q)
+\\-left : ∀ {S T t} → ¬Language S t → ¬Language (S \\ T) t
+\\-left p = ?
 
-check-dist-∩-<: : ∀ {S T} → (check(S) ∩ check(T)) <: check (S ∩ T)
-check-dist-∩-<: (check-ok p , check-ok q) = check-ok (p , q)
-check-dist-∩-<: (p , check-nok) = check-nok
-check-dist-∩-<: (check-nok , q) = check-nok
-check-dist-∩-<: (check-arity p , check-arity q) = check-arity (p , q)
+\\-right : ∀ {S T t} → Language ⌊ T ⌋ t → ¬Language (S \\ T) t
+\\-right p = ?
 
-function-<:-check : ∀ {S T} → (S ⇒ T) <: (check any)
-function-<:-check {t = ⟨ ⟨⟩ ↦ blame callee ⟩} (function-ok p) = check-arity any
-function-<:-check {t = ⟨ ⟨⟩ ↦ blame caller ⟩} (function-arity p) = check-nok
-function-<:-check {t = ⟨ ⟨⟩ ↦ diverge ⟩} (function-ok p) = check-arity any
-function-<:-check {t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} (function-ok p) = check-arity any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame callee ⟩} (function-nok p) = check-ok any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame callee ⟩} (function-ok p) = check-ok any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ blame caller ⟩} (function-nok p) = check-nok
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ diverge ⟩} (function-nok p) = check-ok any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ diverge ⟩} (function-ok p) = check-ok any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩} (function-nok p) = check-ok any
-function-<:-check {t = ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩} (function-ok p) = check-ok any
+\\-case : ∀ {S T t} → ¬Language (S \\ T) t → Either (¬Language S t) (Language ⌊ T ⌋ t)
+\\-case p = ?
+
+<:-function-∪-check : ∀ {S T U} → (check S ∪ (T ⇒ U)) <: ((T \\ S) ⇒ U)
+<:-function-∪-check (left (check-ok p)) = function-nok (\\-right p)
+<:-function-∪-check (left check-nok) = function-ok callee
+<:-function-∪-check (right (function-nok p)) = function-nok (\\-left p)
+<:-function-∪-check (right (function-ok p)) = function-ok p
+<:-function-∪-check (right (function-arity p)) = function-arity (\\-left p)
+
+function-∪-check-<: : ∀ {S T U} → ((T \\ S) ⇒ U) <: (check S ∪ (T ⇒ U))
+function-∪-check-<: (function-nok p) with \\-case p
+function-∪-check-<: (function-nok p) | Left q = right (function-nok q)
+function-∪-check-<: (function-nok p) | Right q = left (check-ok q)
+function-∪-check-<: (function-ok p) = right (function-ok p)
+function-∪-check-<: (function-arity p) with \\-case p
+function-∪-check-<: (function-arity p) | Left q = right (function-arity q)
+function-∪-check-<: (function-arity p) | Right q = {!!} -- left (check-arity q)
 
 -- Properties of scalars
 scalar-<: : ∀ S {T} → Language T ⟨ scalar S ⟩ → (scalar S <: T)
@@ -448,7 +453,7 @@ function-≮:-never = witness (function-ok {t = ⟨⟩} diverge) never
 <:-everything {⟨ scalar BOOLEAN ⟩} p = left (right (scalar BOOLEAN))
 <:-everything {⟨ scalar STRING ⟩} p = left (left (left (right (scalar STRING))))
 <:-everything {⟨ scalar NIL ⟩} p = left (left (right (scalar NIL)))
-<:-everything {⟨ ⟨⟩ ↦ blame callee ⟩} p = left (left (left (left (left (function-ok (callee any))))))
+-- <:-everything {⟨ ⟨⟩ ↦ blame callee ⟩} p = left (left (left (left (left (function-ok (callee any))))))
 <:-everything {⟨ ⟨⟩ ↦ blame caller ⟩} p = left (left (left (left (left (function-arity never)))))
 <:-everything {⟨ ⟨⟩ ↦ diverge ⟩} p = left (left (left (left (left (function-ok diverge)))))
 <:-everything {⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} p = left (left (left (left (left (function-ok (one any))))))
@@ -496,8 +501,8 @@ set-theoretic-if {S₁} {T₁} {S₂} {T₂} p Q q (t , u) Qtu (S₂t , ¬T₂u)
   ¬T₂⊆¬T₁ : Comp(Lift(Language T₂)) ⊆ Comp(Lift(Language T₁))
   ¬T₂⊆¬T₁ (just ⟨ u ⟩) ¬T₂u T₁u with p ⟨ ⟨⟩ ↦ ⟨ u ⟩ ⟩ (function-ok (one T₁u))
   ¬T₂⊆¬T₁ (just ⟨ u ⟩) ¬T₂u T₁u | function-ok (one T₂u) = ¬T₂u T₂u
-  ¬T₂⊆¬T₁ (just error) ¬T₂u T₁u with p ⟨ ⟨⟩ ↦ blame callee ⟩ (function-ok (callee T₁u))
-  ¬T₂⊆¬T₁ (just error) ¬T₂u T₁u | function-ok (callee x) = ¬T₂u x
+  ¬T₂⊆¬T₁ (just error) ¬T₂u T₁u with p ⟨ ⟨⟩ ↦ blame suppression ⟩ (function-ok (suppression T₁u))
+  ¬T₂⊆¬T₁ (just error) ¬T₂u T₁u | function-ok (suppression T₂u) = ¬T₂u T₂u
 
 not-quite-set-theoretic-only-if : ∀ {S₁ T₁ S₂ T₂} →
 
@@ -534,7 +539,7 @@ not-quite-set-theoretic-only-if {S₁} {T₁} {S₂} {T₂} s₂ S₂s₂ p = r 
   r : Language (S₁ ⇒ T₁) ⊆ Language (S₂ ⇒ T₂)
   r ⟨ ⟨ s ⟩ ↦ t ⟩ (function-nok ¬S₁s) = function-nok (¬S₁⊆¬S₂ ⟨ s ⟩ ¬S₁s)
   r ⟨ s ↦ ⟨ t ⟩ ⟩ (function-ok (one T₁t)) = function-ok (one (T₁⊆T₂ ⟨ t ⟩ T₁t))
-  r ⟨ s ↦ blame callee ⟩ (function-ok (callee T₁e)) = function-ok (callee (T₁⊆T₂ error T₁e))
+  r ⟨ s ↦ blame suppression ⟩ (function-ok (suppression T₁e)) = function-ok (suppression (T₁⊆T₂ error T₁e))
   r ⟨ ⟨⟩ ↦ blame caller ⟩ (function-arity ¬S₁e) = function-arity (¬S₁⊆¬S₂ error ¬S₁e)
   r ⟨ s ↦ diverge ⟩ p = function-ok diverge
 
