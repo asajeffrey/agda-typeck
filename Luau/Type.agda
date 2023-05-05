@@ -61,15 +61,15 @@ unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
 
 -- Negated scalar types
 negateScalar : Scalar → Type
-negateScalar NUMBER = ((funktion ∪ string) ∪ nill) ∪ boolean
-negateScalar BOOLEAN = ((funktion ∪ number) ∪ string) ∪ nill
-negateScalar STRING = ((funktion ∪ number) ∪ nill) ∪ boolean
-negateScalar NIL = ((funktion ∪ number) ∪ string) ∪ boolean
+negateScalar NUMBER = (((error ∪ funktion) ∪ string) ∪ nill) ∪ boolean
+negateScalar BOOLEAN = (((error ∪ funktion) ∪ number) ∪ string) ∪ nill
+negateScalar STRING = (((error ∪ funktion) ∪ number) ∪ nill) ∪ boolean
+negateScalar NIL = (((error ∪ funktion) ∪ number) ∪ string) ∪ boolean
 
 -- Negated testable types
 negate : Test → Type
 negate (scalar S) = negateScalar S
-negate function = ((number ∪ string) ∪ nill) ∪ boolean
+negate function = (((error ∪ number) ∪ string) ∪ nill) ∪ boolean
 negate never = any
 negate (T ∪ U) = negate T ∩ negate U
 
