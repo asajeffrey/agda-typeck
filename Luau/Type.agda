@@ -20,6 +20,7 @@ data Test : Set where
   function : Test
   never : Test
   _∪_ : Test → Test → Test
+  _∩_ : Test → Test → Test
 
 data Type : Set where
 
@@ -50,7 +51,7 @@ funktion = (never ⇒ any)
 
 -- Top non-error type
 unknown : Type
-unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
+unknown = ((((funktion ∩ any) ∪ number) ∪ string) ∪ nill) ∪ boolean
 
 -- Covert testable types to types
 ⌊_⌋ : Test → Type
@@ -58,6 +59,7 @@ unknown = (((funktion ∪ number) ∪ string) ∪ nill) ∪ boolean
 ⌊ function ⌋ = funktion
 ⌊ never ⌋ = never
 ⌊ T ∪ U ⌋ = ⌊ T ⌋ ∪ ⌊ U ⌋
+⌊ T ∩ U ⌋ = ⌊ T ⌋ ∩ ⌊ U ⌋
 
 -- Negated scalar types
 negateScalar : Scalar → Type
@@ -72,6 +74,7 @@ negate (scalar S) = negateScalar S
 negate function = (((error ∪ number) ∪ string) ∪ nill) ∪ boolean
 negate never = any
 negate (T ∪ U) = negate T ∩ negate U
+negate (T ∩ U) = negate T ∪ negate U
 
 -- Subtraction of a testable type from a type
 _\\_ : Type → Test → Type
@@ -122,21 +125,33 @@ scalar S ≡ᵀᵀ scalar T with S ≡ˢ T
 scalar S ≡ᵀᵀ function = no (λ ())
 scalar S ≡ᵀᵀ never = no (λ ())
 scalar S ≡ᵀᵀ (T ∪ U) = no (λ ())
+scalar S ≡ᵀᵀ (T ∩ U) = no (λ ())
 function ≡ᵀᵀ scalar T = no (λ ())
 function ≡ᵀᵀ function = yes refl
 function ≡ᵀᵀ never = no (λ ())
 function ≡ᵀᵀ (T ∪ U) = no (λ ())
+function ≡ᵀᵀ (T ∩ U) = no (λ ())
 never ≡ᵀᵀ scalar T = no (λ ())
 never ≡ᵀᵀ function = no (λ ())
 never ≡ᵀᵀ never = yes refl
 never ≡ᵀᵀ (T ∪ U) = no (λ ())
+never ≡ᵀᵀ (T ∩ U) = no (λ ())
 (S ∪ T) ≡ᵀᵀ scalar U = no (λ ())
 (S ∪ T) ≡ᵀᵀ function = no (λ ())
 (S ∪ T) ≡ᵀᵀ never = no (λ ())
+(S ∪ T) ≡ᵀᵀ (U ∩ V) = no (λ ())
 (S ∪ T) ≡ᵀᵀ (U ∪ V) with (S ≡ᵀᵀ U) | (T ≡ᵀᵀ V) 
 (S ∪ T) ≡ᵀᵀ (S ∪ T) | yes refl | yes refl = yes refl
 (S ∪ T) ≡ᵀᵀ (U ∪ V) | _ | no p = no (λ { refl → p refl })
 (S ∪ T) ≡ᵀᵀ (U ∪ V) | no p | _ = no (λ { refl → p refl })
+(S ∩ T) ≡ᵀᵀ scalar U = no (λ ())
+(S ∩ T) ≡ᵀᵀ function = no (λ ())
+(S ∩ T) ≡ᵀᵀ never = no (λ ())
+(S ∩ T) ≡ᵀᵀ (U ∪ V) = no (λ ())
+(S ∩ T) ≡ᵀᵀ (U ∩ V) with (S ≡ᵀᵀ U) | (T ≡ᵀᵀ V) 
+(S ∩ T) ≡ᵀᵀ (S ∩ T) | yes refl | yes refl = yes refl
+(S ∩ T) ≡ᵀᵀ (U ∩ V) | _ | no p = no (λ { refl → p refl })
+(S ∩ T) ≡ᵀᵀ (U ∩ V) | no p | _ = no (λ { refl → p refl })
 
 _≡ᵀ_ : ∀ (T U : Type) → Dec(T ≡ U)
 (S ⇒ T) ≡ᵀ (U ⇒ V) with (S ≡ᵀ U) | (T ≡ᵀ V) 

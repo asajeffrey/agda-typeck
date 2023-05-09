@@ -202,7 +202,7 @@ language-comp (check-none p) check-nok = p refl
 ∩-distl-∪-<: (left (p₁ , p₂)) = (p₁ , left p₂)
 ∩-distl-∪-<: (right (p₁ , p₂)) = (p₁ , right p₂)
 
-<:-∩-distr-∪ : ∀ {S T U} → ((S ∪ T) ∩ U) <:  ((S ∩ U) ∪ (T ∩ U))
+<:-∩-distr-∪ : ∀ {S T U} → ((S ∪ T) ∩ U) <: ((S ∩ U) ∪ (T ∩ U))
 <:-∩-distr-∪ (left p₁ , p₂) = left (p₁ , p₂)
 <:-∩-distr-∪ (right p₁ , p₂) = right (p₁ , p₂)
 
@@ -321,7 +321,7 @@ function-<:-funktion : ∀ {S T} → (S ⇒ T) <: funktion
 function-<:-funktion = <:-function (λ()) (λ p → any)
 
 function-<:-unknown : ∀ {S T} → (S ⇒ T) <: unknown
-function-<:-unknown p = left (left (left (left (function-<:-funktion p))))
+function-<:-unknown p = left (left (left (left (function-<:-funktion p , any))))
 
 error-≮:-function : ∀ {S T} → error ≮: (S ⇒ T)
 error-≮:-function = witness error function-error
@@ -332,6 +332,7 @@ test-¬error {scalar S} = scalar-error S
 test-¬error {function} = function-error
 test-¬error {never} = never
 test-¬error {S ∪ T} = (test-¬error , test-¬error)
+test-¬error {S ∩ T} = left test-¬error
 
 negate-lang : ∀ {S t} → Language ⌊ S ⌋ t → ¬Language (negate S) t
 negate-lang {scalar NUMBER} (scalar NUMBER) = ((((error , function-scalar NUMBER) ,
@@ -358,6 +359,7 @@ negate-lang {function} (function-arity p) = (((error , scalar-function NUMBER) ,
                                               , scalar-function BOOLEAN
 negate-lang {S ∪ T} (left p) = left (negate-lang p)
 negate-lang {S ∪ T} (right p) = right (negate-lang p)
+negate-lang {S ∩ T} (p , q) = (negate-lang p , negate-lang q)
 
 negate-¬lang : ∀ {S t} → ¬Language ⌊ S ⌋ t → Language (negate S) t
 negate-¬lang {scalar NUMBER} (scalar-scalar NUMBER NUMBER p) = CONTRADICTION (p refl)
@@ -412,6 +414,8 @@ negate-¬lang {function} (function-none p caller) = CONTRADICTION (p refl)
 negate-¬lang {function} function-error = left (left (left (left error)))
 negate-¬lang {never} p = any
 negate-¬lang {S ∪ T} (p , q) = (negate-¬lang p , negate-¬lang q)
+negate-¬lang {S ∩ T} (left p) = left (negate-¬lang p)
+negate-¬lang {S ∩ T} (right p) = right (negate-¬lang p)
 
 ¬lang-negate : ∀ {S t} → ¬Language (negate S) t → Language ⌊ S ⌋ t
 ¬lang-negate {S} {t} p with dec-language ⌊ S ⌋ t
@@ -448,6 +452,19 @@ check-dist-∪-<: (left (check-ok p)) = check-ok (left p)
 check-dist-∪-<: (left check-nok) = check-nok
 check-dist-∪-<: (right (check-ok p)) = check-ok (right p)
 check-dist-∪-<: (right check-nok) = check-nok
+
+<:-check-dist-∩ : ∀ {S T} → check (S ∩ T) <: (check(S) ∩ check(T))
+<:-check-dist-∩ (check-ok (p , q)) = (check-ok p , check-ok q)
+<:-check-dist-∩ check-nok = (check-nok , check-nok)
+
+check-dist-∩-<: : ∀ {S T} → (check(S) ∩ check(T)) <: check (S ∩ T)
+check-dist-∩-<: (check-ok p , check-ok q) = check-ok (p , q)
+check-dist-∩-<: (check-ok p , check-nok) = check-nok
+check-dist-∩-<: (check-nok , q) = check-nok
+
+check-<:-function : ∀ {S} → check S <: (never ⇒ any)
+check-<:-function (check-ok p) = function-nok never
+check-<:-function check-nok = function-ok callee
 
 <:-function-∪-check : ∀ {S T U} → (check S ∪ (T ⇒ U)) <: ((T \\ S) ⇒ U)
 <:-function-∪-check (left (check-ok p)) = function-nok (\\-right p)
@@ -553,12 +570,12 @@ function-≮:-never = witness (function-ok {t = ⟨⟩} diverge) never
 <:-everything {⟨ scalar BOOLEAN ⟩} p = left (right (scalar BOOLEAN))
 <:-everything {⟨ scalar STRING ⟩} p = left (left (left (right (scalar STRING))))
 <:-everything {⟨ scalar NIL ⟩} p = left (left (right (scalar NIL)))
-<:-everything {⟨ ⟨⟩ ↦ blame caller ⟩} p = left (left (left (left (left (function-arity never)))))
-<:-everything {⟨ s ↦ blame callee ⟩} p = left (left (left (left (left (function-ok callee)))))
-<:-everything {⟨ s ↦ blame suppression ⟩} p = left (left (left (left (left (function-ok (suppression any))))))
-<:-everything {⟨ ⟨⟩ ↦ diverge ⟩} p = left (left (left (left (left (function-ok diverge)))))
-<:-everything {⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} p = left (left (left (left (left (function-ok (one any))))))
-<:-everything {⟨ ⟨ s ⟩ ↦ t ⟩} p = left (left (left (left (left (function-nok never)))))
+<:-everything {⟨ ⟨⟩ ↦ blame caller ⟩} p = left (left (left (left (left (function-arity never , any)))))
+<:-everything {⟨ s ↦ blame callee ⟩} p = left (left (left (left (left (function-ok callee , any)))))
+<:-everything {⟨ s ↦ blame suppression ⟩} p = left (left (left (left (left (function-ok (suppression any) , any)))))
+<:-everything {⟨ ⟨⟩ ↦ diverge ⟩} p = left (left (left (left (left (function-ok diverge , any)))))
+<:-everything {⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} p = left (left (left (left (left (function-ok (one any) , any)))))
+<:-everything {⟨ ⟨ s ⟩ ↦ t ⟩} p = left (left (left (left (left (function-nok never , any)))))
 
 -- A Gentle Introduction To Semantic Subtyping (https://www.cduce.org/papers/gentle.pdf)
 -- defines a "set-theoretic" model (sec 2.5)
