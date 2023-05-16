@@ -4,14 +4,14 @@ module Properties.DecSubtyping where
 
 open import Agda.Builtin.Equality using (_≡_; refl)
 open import FFI.Data.Either using (Either; Left; Right; mapLR; swapLR; cond)
-open import Luau.Subtyping using (_<:_; _≮:_; Language; ¬Language; witness; any; never; scalar; error; warning; scalar-function; scalar-scalar; function-scalar; function-ok; function-nok; function-error; function-warning; function-function; none; one; untyped; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; ⟨untyped⟩)
-open import Luau.Type using (Type; Scalar; scalar; never; any; _⇒_; _∪_; _∩_)
+open import Luau.Subtyping using (_<:_; _≮:_; Language; ¬Language; witness; any; never; scalar; error; warning; scalar-function; scalar-scalar; function-scalar; function-ok; function-nok; function-error; function-arity; function-function; function-none; function-one; untyped; left; right; _,_; _↦_; ⟨⟩; ⟨_⟩; one; blame; caller; suppression)
+open import Luau.Type using (Type; Scalar; scalar; never; any; check; _⇒_; _∪_; _∩_; ⌊_⌋)
 open import Luau.TypeNormalization using (_∪ⁿ_; _∩ⁿ_)
 open import Luau.TypeSaturation using (saturate)
 open import Properties.Contradiction using (CONTRADICTION; ¬)
 open import Properties.Functions using (_∘_)
 open import Properties.Subtyping using (<:-refl; <:-trans; ≮:-trans-<:; <:-trans-≮:; <:-never; <:-any; <:-∪-left; <:-∪-right; <:-∪-lub;  ≮:-∪-left; ≮:-∪-right; <:-∩-left; <:-∩-right; <:-∩-glb;  ≮:-∩-left; ≮:-∩-right; dec-language; scalar-<:; error-<:; <:-everything; <:-function; ≮:-function-left; ≮:-function-right; <:-impl-¬≮:; <:-intersect; <:-function-∩-∪; <:-function-∩; <:-union; ≮:-left-∪; ≮:-right-∪; <:-∩-distr-∪; <:-impl-⊇; language-comp)
-open import Properties.TypeNormalization using (ErrScalar; FunType; Normal; never; scalar; error; _∩_; _∪_; _⇒_; normal; <:-normalize; normalize-<:; normal-∩ⁿ; normal-∪ⁿ; ∪-<:-∪ⁿ; ∪ⁿ-<:-∪; ∩ⁿ-<:-∩; ∩-<:-∩ⁿ; normalᶠ; fun-top; fun-function; fun-¬scalar; ¬scalar-fun; fun-¬error)
+open import Properties.TypeNormalization using (ErrScalar; FunType; Normal; never; scalar; error; any; check; _∩_; _∪_; _⇒_; normal; <:-normalize; normalize-<:; normal-∩ⁿ; normal-∪ⁿ; normal-∪ᶠ; ∪-<:-∪ᶠ; ∪-<:-∪ⁿ; ∪ⁿ-<:-∪; ∩ⁿ-<:-∩; ∩-<:-∩ⁿ; normalᶠ; fun-top; fun-function; fun-¬scalar; ¬scalar-fun; fun-¬error; <:-fun-∩-check)
 open import Properties.TypeSaturation using (Overloads; Saturated; _⊆ᵒ_; _<:ᵒ_; defn; here; left; right; ov-language; ov-<:; saturated; normal-saturate; saturate-<:; <:-saturate; <:ᵒ-impl-<:; _>>=ˡ_; _>>=ʳ_)
 open import Properties.Equality using (_≢_)
 
@@ -24,10 +24,10 @@ dec-subtypingᶠⁿ : ∀ {F U} → FunType F → Normal U → Either (F ≮: U)
 dec-subtypingⁿ : ∀ {T U} → Normal T → Normal U → Either (T ≮: U) (T <: U)
 dec-subtyping : ∀ T U → Either (T ≮: U) (T <: U)
 
-dec-subtypingˢⁿ (scalar T) U with dec-language _ ⟨ scalar T ⟩
+dec-subtypingˢⁿ (scalar T) U with dec-language _ (scalar T)
 dec-subtypingˢⁿ (scalar T) U | Left p = Left (witness (scalar T) p)
 dec-subtypingˢⁿ (scalar T) U | Right p = Right (scalar-<: T p)
-dec-subtypingˢⁿ error U with dec-language _ error
+dec-subtypingˢⁿ error U with dec-language _ untyped
 dec-subtypingˢⁿ error U | Left p = Left (witness error p)
 dec-subtypingˢⁿ error U | Right p = Right (error-<: p)
 
@@ -51,7 +51,8 @@ dec-subtypingˢᶠ {F} Fᶠ (defn sat-∩ sat-∪) (S ⇒ T) = result (top Fᶠ 
 
   result : Top F → Either (F ≮: (S ⇒ T)) (F <:ᵒ (S ⇒ T))
   result (defn Sᵗ Tᵗ oᵗ srcᵗ) with dec-subtyping S Sᵗ
-  result (defn Sᵗ Tᵗ oᵗ srcᵗ) | Left (witness Ss ¬Sᵗs) = Left (witness (ov-language Fᶠ (λ o → function-warning (<:-impl-⊇ (srcᵗ o) ¬Sᵗs))) (function-warning Ss))
+--  result (defn Sᵗ Tᵗ oᵗ srcᵗ) | Left (witness {t = error} Se ¬Sᵗe) = Left (witness {t = ⟨ ⟨⟩ ↦ blame caller ⟩} (ov-language Fᶠ (λ o → function-arity (<:-impl-⊇ (srcᵗ o) ¬Sᵗe))) (function-arity Se))
+--  result (defn Sᵗ Tᵗ oᵗ srcᵗ) | Left (witness {t = ⟨ s ⟩} Ss ¬Sᵗs) = Left (witness {t = ⟨ ⟨ s ⟩ ↦ blame caller ⟩} (ov-language Fᶠ (λ o → function-nok (<:-impl-⊇ (srcᵗ o) ¬Sᵗs))) (function-one Ss caller))
   result (defn Sᵗ Tᵗ oᵗ srcᵗ) | Right S<:Sᵗ = result₀ (largest Fᶠ (λ o → o)) where
 
     data LargestSrc (G : Type) : Set where
@@ -90,8 +91,8 @@ dec-subtypingˢᶠ {F} Fᶠ (defn sat-∩ sat-∪) (S ⇒ T) = result (top Fᶠ 
          })
 
     result₀ : LargestSrc F → Either (F ≮: (S ⇒ T)) (F <:ᵒ (S ⇒ T))
-    result₀ (no S₀ T₀ o₀ (witness {error} T₀t ¬Tt) tgt₀) = Left (witness {t = ⟨ ⟨⟩ ↦ error ⟩} (ov-language Fᶠ (λ o → function-ok (error (tgt₀ o T₀t)))) (function-function none (error ¬Tt)))
-    result₀ (no S₀ T₀ o₀ (witness {⟨ t ⟩} T₀t ¬Tt) tgt₀) = Left (witness {t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} (ov-language Fᶠ (λ o → function-ok (one (tgt₀ o T₀t)))) (function-function none (one ¬Tt)))
+--    result₀ (no S₀ T₀ o₀ (witness {t = error} T₀e ¬Te) tgt₀) = Left (witness {t = ⟨ ⟨⟩ ↦ blame suppression ⟩} (ov-language Fᶠ (λ o → function-ok (suppression (tgt₀ o T₀e)))) (function-none (λ ()) (suppression ¬Te)))
+--    result₀ (no S₀ T₀ o₀ (witness {t = ⟨ t ⟩} T₀t ¬Tt) tgt₀) = Left (witness {t = ⟨ ⟨⟩ ↦ ⟨ t ⟩ ⟩} (ov-language Fᶠ (λ o → function-ok (one (tgt₀ o T₀t)))) (function-none (λ ()) (one ¬Tt)))
     result₀ (yes S₀ T₀ o₀ T₀<:T src₀) with dec-subtyping S S₀
     result₀ (yes S₀ T₀ o₀ T₀<:T src₀) | Right S<:S₀ = Right λ { here → defn o₀ S<:S₀ T₀<:T }
     result₀ (yes S₀ T₀ o₀ T₀<:T src₀) | Left (witness {s} Ss ¬S₀s) = Left (result₁ s Ss ¬S₀s (smallest Fᶠ (λ o → o))) where
@@ -120,32 +121,11 @@ dec-subtypingˢᶠ {F} Fᶠ (defn sat-∩ sat-∪) (S ⇒ T) = result (top Fᶠ 
       result₁ : ∀ s → Language S s → ¬Language S₀ s → SmallestTgt F s → (F ≮: (S ⇒ T))
       result₁ s Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) with dec-subtyping T₁ T
       result₁ s Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Right T₁<:T = CONTRADICTION (language-comp ¬S₀s (src₀ o₁ T₁<:T S₁s))
-      result₁ error Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Left (witness {error} T₁t ¬Tt) = witness (ov-language Fᶠ lemma) (function-function (untyped Ss) (error ¬Tt)) where
+      result₁ s Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Left (witness {t} T₁t ¬Tt) = witness (ov-language Fᶠ lemma) (function-one Ss (one ¬Tt)) where
 
-        lemma : ∀ {S′ T′} → Overloads F (S′ ⇒ T′) → Language (S′ ⇒ T′) ⟨ ⟨untyped⟩ ↦ error ⟩
-        lemma {S′} {T′} o with dec-language S′ error
-        lemma {S′} {T′} o | Left ¬S′e = function-nok (untyped ¬S′e)
-        lemma {S′} {T′} o | Right S′e = function-ok (error (tgt₁ o S′e T₁t))
-
-      result₁ error Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Left (witness {⟨ t ⟩} T₁t ¬Tt) = witness (ov-language Fᶠ lemma) (function-function (untyped Ss) (one ¬Tt)) where
-
-        lemma : ∀ {S′ T′} → Overloads F (S′ ⇒ T′) → Language (S′ ⇒ T′) ⟨ ⟨untyped⟩ ↦ ⟨ t ⟩ ⟩
-        lemma {S′} {T′} o with dec-language S′ error
-        lemma {S′} {T′} o | Left ¬S′e = function-nok (untyped ¬S′e)
-        lemma {S′} {T′} o | Right S′e = function-ok (one (tgt₁ o S′e T₁t))
-
-      result₁ ⟨ s ⟩ Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Left (witness {error} T₁t ¬Tt) = witness (ov-language Fᶠ lemma) (function-function (one Ss) (error ¬Tt)) where
-
-        lemma : ∀ {S′ T′} → Overloads F (S′ ⇒ T′) → Language (S′ ⇒ T′) ⟨ ⟨ s ⟩ ↦ error ⟩
-        lemma {S′} {T′} o with dec-language S′ ⟨ s ⟩
-        lemma {S′} {T′} o | Left ¬S′s = function-nok (one ¬S′s)
-        lemma {S′} {T′} o | Right S′s = function-ok (error (tgt₁ o S′s T₁t))
-
-      result₁ ⟨ s ⟩ Ss ¬S₀s (defn S₁ T₁ o₁ S₁s tgt₁) | Left (witness {⟨ t ⟩} T₁t ¬Tt) = witness (ov-language Fᶠ lemma) (function-function (one Ss) (one ¬Tt)) where
-
-        lemma : ∀ {S′ T′} → Overloads F (S′ ⇒ T′) → Language (S′ ⇒ T′) ⟨ ⟨ s ⟩ ↦ ⟨ t ⟩ ⟩
-        lemma {S′} {T′} o with dec-language S′ ⟨ s ⟩
-        lemma {S′} {T′} o | Left ¬S′s = function-nok (one ¬S′s)
+        lemma : ∀ {S′ T′} → Overloads F (S′ ⇒ T′) → Language (S′ ⇒ T′) (⟨ s ⟩ ↦ ⟨ t ⟩)
+        lemma {S′} {T′} o with dec-language S′ s
+        lemma {S′} {T′} o | Left ¬S′s = function-nok ¬S′s
         lemma {S′} {T′} o | Right S′s = function-ok (one (tgt₁ o S′s T₁t))
 
 dec-subtypingˢᶠ F Fˢ (G ∩ H) with dec-subtypingˢᶠ F Fˢ G | dec-subtypingˢᶠ F Fˢ H
@@ -158,16 +138,27 @@ dec-subtypingᶠ F G | Left H≮:G = Left (<:-trans-≮: (saturate-<: F) H≮:G)
 dec-subtypingᶠ F G | Right H<:G = Right (<:-trans (<:-saturate F) (<:ᵒ-impl-<: (normal-saturate F) G H<:G))
 
 dec-subtypingᶠⁿ T never = Left (witness (fun-function T) never)
-dec-subtypingᶠⁿ T (U ⇒ V) = dec-subtypingᶠ T (U ⇒ V)
-dec-subtypingᶠⁿ T (U ∩ V) = dec-subtypingᶠ T (U ∩ V)
+dec-subtypingᶠⁿ T (U ∩ any) with dec-subtypingᶠ T U
+dec-subtypingᶠⁿ T (U ∩ any) | Left p = Left (≮:-trans-<: p <:-∩-left)
+dec-subtypingᶠⁿ T (U ∩ any) | Right p = Right (<:-trans p (<:-∩-glb <:-refl <:-any))
+dec-subtypingᶠⁿ T (U ∩ check V) with dec-subtypingᶠ T (normal-∪ᶠ U (⌊ V ⌋ ⇒ never))
+dec-subtypingᶠⁿ T (U ∩ check V) | Left p = Left (≮:-trans-<: p (<:-trans (<:-trans <:-∩-left <:-∪-left) (∪-<:-∪ᶠ U (⌊ V ⌋ ⇒ never))))
+dec-subtypingᶠⁿ T (U ∩ check V) | Right p = Right (<:-trans {!!} (<:-trans {!!} (<:-trans {!!} {!!})))
 dec-subtypingᶠⁿ T (U ∪ V) with dec-subtypingᶠⁿ T U
 dec-subtypingᶠⁿ T (U ∪ error) | Left (witness p q) = Left (witness p (q , fun-¬error T p))
 dec-subtypingᶠⁿ T (U ∪ scalar V) | Left (witness p q) = Left (witness p (q , fun-¬scalar V T p))
 dec-subtypingᶠⁿ T (U ∪ V) | Right p = Right (<:-trans p <:-∪-left)
 
 dec-subtypingⁿ never U = Right <:-never
-dec-subtypingⁿ (S ⇒ T) U = dec-subtypingᶠⁿ (S ⇒ T) U
-dec-subtypingⁿ (S ∩ T) U = dec-subtypingᶠⁿ (S ∩ T) U
+dec-subtypingⁿ (F ∩ T) (G ∩ any) = {!!}
+dec-subtypingⁿ (F ∩ any) (G ∩ check T) = {!!}
+dec-subtypingⁿ (F ∩ check S) (G ∩ check T) = {!!}
+dec-subtypingⁿ (F ∩ T) (U ∪ V) with dec-subtypingⁿ (F ∩ T) U
+dec-subtypingⁿ (F ∩ T) (U ∪ error) | Left (witness (p₁ , p₂) q) = Left (witness (p₁ , p₂) (q , fun-¬error F p₁))
+dec-subtypingⁿ (F ∩ T) (U ∪ scalar S) | Left (witness (p₁ , p₂) q) = Left (witness (p₁ , p₂) (q , fun-¬scalar S F p₁))
+dec-subtypingⁿ (F ∩ T) (U ∪ V) | Right p = Right (<:-trans p <:-∪-left)
+dec-subtypingⁿ (F ∩ any) never = Left (witness (fun-function F , any) never)
+dec-subtypingⁿ (F ∩ check T) never = Left (witness (fun-function F , {!!}) never)
 dec-subtypingⁿ (S ∪ T) U with dec-subtypingⁿ S U | dec-subtypingˢⁿ T U
 dec-subtypingⁿ (S ∪ T) U | Left p | q = Left (≮:-∪-left p)
 dec-subtypingⁿ (S ∪ T) U | Right p | Left q = Left (≮:-∪-right q)

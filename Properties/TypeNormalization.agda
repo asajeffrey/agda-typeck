@@ -3,12 +3,12 @@
 module Properties.TypeNormalization where
 
 open import Agda.Builtin.Equality using (refl)
-open import Luau.Type using (Type; Scalar; nill; number; string; boolean; error; never; any; unknown; scalar; check; function; _⇒_; _∪_; _∩_; _\\_; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; _≡ᵀ_)
-open import Luau.Subtyping using (Language; ¬Language; scalar; any; left; right; function-ok; function-error; function-nok; scalar-function; function-scalar; function-arity; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge)
+open import Luau.Type using (Type; Scalar; nill; number; string; boolean; error; never; any; unknown; scalar; check; function; _⇒_; _∪_; _∩_; _\\_; ⌊_⌋; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; _≡ᵀ_)
+open import Luau.Subtyping using (Language; ¬Language; scalar; any; left; right; function-ok; function-error; function-nok; scalar-function; function-scalar; function-none; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; untyped)
 open import Luau.TypeNormalization using (_∪ⁿ_; _∩ⁿ_; _∪ᶠ_; _∪ⁿˢ_; _∩ⁿˢ_; normalize)
 open import Luau.Subtyping using (_<:_; _≮:_; witness; never)
 open import Properties.Dec using (Dec; yes; no)
-open import Properties.Subtyping using (<:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-∩-assocl; <:-∩-assocr; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; ∩-distr-∪-<:; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never; <:-check-dist-∪; check-dist-∪-<:; <:-check-dist-∩; check-dist-∩-<:; <:-check; check-<:-function; function-∪-check-<:; <:-function-∪-check)
+open import Properties.Subtyping using (<:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-∩-assocl; <:-∩-assocr; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; ∩-distr-∪-<:; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never; <:-check-dist-∪; check-dist-∪-<:; <:-check-dist-∩; check-dist-∩-<:; <:-check; check-<:-function; function-∪-check-<:; <:-function-∪-check; <:-function-∩-check)
 
 data ErrScalar : Type → Set where
   error : ErrScalar error
@@ -45,7 +45,7 @@ fun-top (S ⇒ T) = <:-function <:-never <:-any
 fun-top (F ∩ G) = <:-trans <:-∩-left (fun-top F)
 
 -- function types are inhabited
-fun-function : ∀ {F} → FunType F → Language F ⟨ ⟨⟩ ↦ diverge ⟩
+fun-function : ∀ {F} → FunType F → Language F (⟨⟩ ↦ diverge)
 fun-function (S ⇒ T) = function-ok diverge
 fun-function (F ∩ G) = (fun-function F , fun-function G)
 
@@ -56,10 +56,10 @@ fun-≮:-never F = witness (fun-function F) never
 fun-¬scalar : ∀ S {F t} → FunType F → Language F t → ¬Language (scalar S) t
 fun-¬scalar s (S ⇒ T) (function-nok p) = scalar-function s
 fun-¬scalar s (S ⇒ T) (function-ok p) = scalar-function s
-fun-¬scalar s (S ⇒ T) (function-arity p) = scalar-function s
+fun-¬scalar s (S ⇒ T) function-none = scalar-function s
 fun-¬scalar s (F ∩ G) (p , q) = fun-¬scalar s G q
 
-¬scalar-fun : ∀ {F} → FunType F → ∀ S → ¬Language F ⟨ scalar S ⟩
+¬scalar-fun : ∀ {F} → FunType F → ∀ S → ¬Language F (scalar S)
 ¬scalar-fun (S ⇒ T) s = function-scalar s
 ¬scalar-fun (F ∩ G) s = left (¬scalar-fun F s)
 
@@ -71,12 +71,12 @@ fun-≮:-scalar F s = witness (fun-function F) (scalar-function s)
 
 -- function types aren't errors
 fun-¬error : ∀ {F t} → FunType F → Language F t → ¬Language error t
-fun-¬error (S ⇒ T) (function-nok p) = error
-fun-¬error (S ⇒ T) (function-ok p) = error
-fun-¬error (S ⇒ T) (function-arity p) = error
+fun-¬error (S ⇒ T) (function-nok p) = error (λ ())
+fun-¬error (S ⇒ T) (function-ok p) = error (λ ())
+fun-¬error (S ⇒ T) function-none = error (λ ())
 fun-¬error (F ∩ G) (p , q) = fun-¬error G q
 
-¬error-fun : ∀ {F} → FunType F → ¬Language F error
+¬error-fun : ∀ {F} → FunType F → ¬Language F untyped
 ¬error-fun (S ⇒ T) = function-error
 ¬error-fun (F ∩ G) = left (¬error-fun F)
 
@@ -168,6 +168,12 @@ fun-∩-error-<:-never (F ∩ G) = <:-trans (<:-intersect <:-∩-left <:-refl) (
 fun-∩-errscalar-<:-never : ∀ {F} → FunType F → ∀ {S} → ErrScalar S → ∀ {V} → (F ∩ S) <: V
 fun-∩-errscalar-<:-never F error = fun-∩-error-<:-never F
 fun-∩-errscalar-<:-never F (scalar S) = fun-∩-scalar-<:-never F S
+
+<:-fun-∩-check : ∀ {S F} → (FunType F) → ((F ∪ (⌊ S ⌋ ⇒ never)) ∩ (check S)) <: (F ∩ (check S))
+<:-fun-∩-check (S ⇒ T) = <:-function-∩-check
+<:-fun-∩-check {S} (F ∩ G) = <:-trans (<:-∩-glb (<:-intersect (<:-union <:-∩-left <:-refl) <:-refl) (<:-intersect (<:-union <:-∩-right <:-refl) <:-refl))
+  (<:-trans (<:-intersect (<:-fun-∩-check {S} F) (<:-fun-∩-check {S} G))
+    (<:-∩-glb (<:-intersect <:-∩-left <:-∩-left) (<:-trans <:-∩-right <:-∩-right)))
 
 flipper : ∀ {S T U} → ((S ∪ T) ∪ U) <: ((S ∪ U) ∪ T)
 flipper = <:-trans <:-∪-assocr (<:-trans (<:-union <:-refl <:-∪-symm) <:-∪-assocl)
