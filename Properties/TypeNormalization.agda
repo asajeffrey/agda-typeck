@@ -3,12 +3,14 @@
 module Properties.TypeNormalization where
 
 open import Agda.Builtin.Equality using (refl)
+open import FFI.Data.Either using (Either; Left; Right)
 open import Luau.Type using (Type; Scalar; nill; number; string; boolean; error; never; any; unknown; scalar; check; function; _⇒_; _∪_; _∩_; _\\_; ⌊_⌋; NIL; NUMBER; STRING; BOOLEAN; _≡ˢ_; _≡ᵀ_)
-open import Luau.Subtyping using (Language; ¬Language; scalar; any; left; right; function-ok; function-error; function-nok; scalar-function; function-scalar; function-none; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; untyped)
+open import Luau.Subtyping using (Language; ¬Language; scalar; any; left; right; function-ok; function-error; function-nok; scalar-function; function-scalar; function-none; check-none; check-ok; _,_; _↦_; ⟨⟩; ⟨_⟩; error; diverge; untyped; witness)
 open import Luau.TypeNormalization using (_∪ⁿ_; _∩ⁿ_; _∪ᶠ_; _∪ⁿˢ_; _∩ⁿˢ_; normalize)
 open import Luau.Subtyping using (_<:_; _≮:_; witness; never)
+open import Properties.Contradiction using (CONTRADICTION; ¬)
 open import Properties.Dec using (Dec; yes; no)
-open import Properties.Subtyping using (<:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-∩-assocl; <:-∩-assocr; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; ∩-distr-∪-<:; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never; <:-check-dist-∪; check-dist-∪-<:; <:-check-dist-∩; check-dist-∩-<:; <:-check; check-<:-function; function-∪-check-<:; <:-function-∪-check; <:-function-∩-check)
+open import Properties.Subtyping using (language-comp; <:-trans; <:-refl; <:-any; <:-never; <:-∪-left; <:-∪-right; <:-∪-lub; <:-∩-left; <:-∩-right; <:-∩-glb; <:-∩-symm; <:-∩-assocl; <:-∩-assocr; <:-function; <:-function-∪-∩; <:-function-∩-∪; <:-function-∪; <:-everything; <:-union; <:-∪-assocl; <:-∪-assocr; <:-∪-symm; <:-intersect;  ∪-distl-∩-<:; ∪-distr-∩-<:; <:-∪-distr-∩; <:-∪-distl-∩; ∩-distl-∪-<:; <:-∩-distl-∪; <:-∩-distr-∪; ∩-distr-∪-<:; function-∩-scalar-<:-never; function-∩-error-<:-never; error-∩-scalar-<:-never; scalar-∩-error-<:-never; scalar-≢-∩-<:-never; <:-check-dist-∪; check-dist-∪-<:; <:-check-dist-∩; check-dist-∩-<:; <:-check; check-<:-function; function-∪-check-<:; <:-function-∪-check; <:-function-∩-check; \\-case)
 
 data ErrScalar : Type → Set where
   error : ErrScalar error
@@ -45,12 +47,16 @@ fun-top (S ⇒ T) = <:-function <:-never <:-any
 fun-top (F ∩ G) = <:-trans <:-∩-left (fun-top F)
 
 -- function types are inhabited
-fun-function : ∀ {F} → FunType F → Language F (⟨⟩ ↦ diverge)
+fun-none : ∀ {F} → FunType F → Language F (⟨⟩ ↦ error)
+fun-none (S ⇒ T) = function-none
+fun-none (F ∩ G) = (fun-none F , fun-none G)
+
+fun-function : ∀ {F s} → FunType F → Language F (s ↦ diverge)
 fun-function (S ⇒ T) = function-ok diverge
 fun-function (F ∩ G) = (fun-function F , fun-function G)
 
 fun-≮:-never : ∀ {F} → FunType F → (F ≮: never)
-fun-≮:-never F = witness (fun-function F) never
+fun-≮:-never F = witness (fun-none F) never
 
 -- function types aren't scalars
 fun-¬scalar : ∀ S {F t} → FunType F → Language F t → ¬Language (scalar S) t
@@ -67,7 +73,7 @@ scalar-≮:-fun : ∀ {F} → FunType F → ∀ S → scalar S ≮: F
 scalar-≮:-fun F s = witness (scalar s) (¬scalar-fun F s)
 
 fun-≮:-scalar : ∀ {F} → FunType F → ∀ S → F ≮: scalar S
-fun-≮:-scalar F s = witness (fun-function F) (scalar-function s)
+fun-≮:-scalar F s = witness (fun-function {s = ⟨⟩} F) (scalar-function s)
 
 -- function types aren't errors
 fun-¬error : ∀ {F t} → FunType F → Language F t → ¬Language error t
@@ -82,6 +88,16 @@ fun-¬error (F ∩ G) (p , q) = fun-¬error G q
 
 error-≮:-fun : ∀ {F} → FunType F → error ≮: F
 error-≮:-fun F = witness error (¬error-fun F)
+
+fun-∩-check-≮:-check : ∀ {S T G} → FunType G → (T ∩ ((any \\ S) ⇒ never)) ≮: G → (T ∩ check S) ≮: G
+fun-∩-check-≮:-check G (witness (p , function-nok q) r) with \\-case q
+fun-∩-check-≮:-check G (witness (p , function-nok q) r) | Right s = witness (p , check-ok s) r
+fun-∩-check-≮:-check G (witness (p , function-ok diverge) r) = CONTRADICTION (language-comp r (fun-function G))
+fun-∩-check-≮:-check G (witness (p , function-none) r) = CONTRADICTION (language-comp r (fun-none G))
+
+-- function types aren't checked
+fun-≮:-check : ∀ {S F} → FunType F → F ≮: check S
+fun-≮:-check F = witness (fun-none F) (check-none (λ ()))
 
 -- unknown is normal
 normal-unknown : Normal unknown
@@ -99,7 +115,7 @@ normal-∪ᶜᶠ : ∀ {S G} → Check S → FunType G → FunType (S ∪ᶠ G)
 
 normal (scalar S) = never ∪ scalar S
 normal (S ⇒ T) = (S ⇒ T) ∩ any
-normal (check S) = (never ⇒ any) ∩ (check S)
+normal (check S) = ((any \\ S) ⇒ never) ∩ (check S)
 normal never = never
 normal any = normal-unknown ∪ error
 normal error = never ∪ error

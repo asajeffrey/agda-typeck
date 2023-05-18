@@ -418,9 +418,9 @@ check-dist-∩-<: (check-ok p , check-ok q) = check-ok (p , q)
 check-dist-∩-<: (check-nok , q) = check-nok
 check-dist-∩-<: (p , check-nok) = check-nok
 
-check-<:-function : ∀ {S} → check S <: (never ⇒ any)
-check-<:-function (check-ok p) = function-nok never
-check-<:-function check-nok = function-ok diverge
+-- check-<:-function : ∀ {S} → check S <: (never ⇒ any)
+-- check-<:-function (check-ok p) = function-nok never
+-- check-<:-function check-nok = function-ok diverge
 
 <:-function-∪-check : ∀ {S T U} → (check S ∪ (T ⇒ U)) <: ((T \\ S) ⇒ U)
 <:-function-∪-check (left (check-ok p)) = function-nok (\\-right p)
@@ -442,6 +442,16 @@ function-∪-check-<: function-none = right function-none
 <:-function-∩-check (right (function-nok p) , check-ok q) = CONTRADICTION (language-comp p q)
 <:-function-∩-check (right (function-nok p) , check-nok) = (function-ok diverge , check-nok)
 <:-function-∩-check (right (function-ok diverge) , q) = (function-ok diverge , q)
+
+check-<:-function : ∀ {S} → check S <: ((any \\ S) ⇒ never)
+check-<:-function (check-ok p) = function-nok (\\-right p)
+check-<:-function check-nok = function-ok diverge
+
+function-∩-check-<:-check : ∀ {S T} → (((any \\ S) ⇒ never) ∩ check T) <: check (S ∩ T)
+function-∩-check-<:-check (function-nok p , check-ok q) with \\-case p
+function-∩-check-<:-check (function-nok p , check-ok q) | Right r = check-ok (r , q)
+function-∩-check-<:-check (function-nok p , check-nok) = check-nok
+function-∩-check-<:-check (function-ok diverge , q) = check-nok
 
 -- Properties of scalars
 scalar-<: : ∀ S {T} → Language T (scalar S) → (scalar S <: T)

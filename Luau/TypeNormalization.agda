@@ -63,7 +63,7 @@ F ∪ⁿˢ T = F ∪ T
 normalize : Type → Type
 normalize (scalar S) = never ∪ (scalar S)
 normalize (S ⇒ T) = (S ⇒ T) ∩ any
-normalize (check S) = (never ⇒ any) ∩ (check S)
+normalize (check S) = ((any \\ S) ⇒ never) ∩ (check S)
 normalize never = never
 normalize any = unknown ∪ error
 normalize error = never ∪ error
