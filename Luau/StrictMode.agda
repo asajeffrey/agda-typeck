@@ -177,18 +177,6 @@ data Warningᴮ H {Γ} where
     -------------------------
     Warningᴮ H (function D₁ D₂)
 
-  CheckedDefnMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
-
-    (V ≮:ᵘ U) →
-    -------------------------
-    Warningᴮ H (checked D₁ D₂ D₃)
-
-  CheckedErrorMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
-
-    (E ≮: error) →
-    -------------------------
-    Warningᴮ H (checked D₁ D₂ D₃)
-
   function₁ : ∀ {f x B C T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W} →
 
     Warningᴮ H D₁ →
@@ -201,6 +189,30 @@ data Warningᴮ H {Γ} where
     --------------------
     Warningᴮ H (function D₁ D₂)
 
+  CheckedDefnMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    (V ≮:ᵘ U) →
+    -------------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
+
+  CheckedErrorMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    (E ≮: error) →
+    -------------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
+
+  checked₁ : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    Warningᴮ H D₁ →
+    --------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
+
+  checked₃ : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    Warningᴮ H D₃ →
+    --------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
+
   UnsafeLocal : ∀ {x M B T U V} {D₁ : Γ ⊢ᴱ M ∈ U} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
 
     Unsafe T →
@@ -212,6 +224,12 @@ data Warningᴮ H {Γ} where
     Unsafe (T ⇒ U) →
     --------------------
     Warningᴮ H (function D₁ D₂)
+
+  UnsafeChecked : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    Unsafe (T ⇒ U) →
+    --------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
     
 data Warningᴼ (H : Heap yes) : ∀ {V} → (⊢ᴼ V) → Set where
 
