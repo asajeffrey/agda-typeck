@@ -6,11 +6,11 @@ open import Agda.Builtin.Equality using (_≡_)
 open import FFI.Data.Either using (Either; Left; Right)
 open import FFI.Data.Maybe using (Maybe; just)
 open import Luau.ResolveOverloads using (resolve)
-open import Luau.Syntax using (Expr; Stat; Block; BinaryOperator; yes; nil; addr; num; bool; str; val; var; var_∈_; _⟨_⟩∈_; _⟨_∌_⟩∈_; function_is_end; _$_; block_is_end; binexp; local_←_; _∙_; done; return; name; +; -; *; /; <; >; ==; ~=; <=; >=; ··)
+open import Luau.Syntax using (Expr; Stat; Block; BinaryOperator; yes; nil; addr; num; bool; str; val; var; var_∈_; _⟨_⟩∈_; _⟨_∋_⟩∈_; function_is_end; _$_; block_is_end; binexp; local_←_; _∙_; done; return; name; +; -; *; /; <; >; ==; ~=; <=; >=; ··)
 open import Luau.Var using (Var)
 open import Luau.Addr using (Addr)
 open import Luau.Heap using (Heap; Object; function_is_end) renaming (_[_] to _[_]ᴴ)
-open import Luau.Type using (Type; nill; any; number; boolean; string; negate; error; _⇒_; _∩_)
+open import Luau.Type using (Type; nill; any; number; boolean; string; check; _⇒_; _∩_; ⌊_⌋)
 open import Luau.VarCtxt using (VarCtxt; ∅; _⋒_; _↦_; _⊕_↦_; _⊝_) renaming (_[_] to _[_]ⱽ)
 open import FFI.Data.Vector using (Vector)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
@@ -71,13 +71,20 @@ data _⊢ᴮ_∈_ where
     --------------------------------
     Γ ⊢ᴮ local var x ∈ T ← M ∙ B ∈ V
 
-  function : ∀ {f x B C E S T U V W Γ} →
+  function : ∀ {f x B C T U V W Γ} →
 
-    (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E →
     (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V →
-    (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W →
+    (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W →
     -------------------------------------------------
-    Γ ⊢ᴮ function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B ∈ W
+    Γ ⊢ᴮ function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B ∈ W
+
+  checked : ∀ {f x B C S T U V W X Γ} →
+
+    (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V →
+    (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ W →
+    (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ X →
+    -------------------------------------------------
+    Γ ⊢ᴮ function f ⟨ S ∋ var x ∈ T ⟩∈ U is C end ∙ B ∈ X
 
 data _⊢ᴱ_∈_ where
 
@@ -119,12 +126,18 @@ data _⊢ᴱ_∈_ where
     ----------------------------
     Γ ⊢ᴱ (M $ N) ∈ (resolve T U)
 
-  function : ∀ {f x B E S T U V Γ} →
+  function : ∀ {f x B T U V Γ} →
 
-    (Γ ⊕ x ↦ S) ⊢ᴮ B ∈ E →
     (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V →
     -----------------------------------------------------
-    Γ ⊢ᴱ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) ∈ ((S ⇒ error) ∩ (T ⇒ U))
+    Γ ⊢ᴱ (function f ⟨ var x ∈ T ⟩∈ U is B end) ∈ (T ⇒ U)
+
+  checked : ∀ {f x B S T U V W Γ} →
+
+    (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V →
+    (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ W →
+    -----------------------------------------------------
+    Γ ⊢ᴱ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end) ∈ ((T ⇒ U) ∩ check S)
 
   block : ∀ {b B T U Γ} →
 
@@ -146,12 +159,20 @@ data ⊢ᴼ_ : Maybe(Object yes) → Set where
     ---------
     ⊢ᴼ nothing
 
-  function : ∀ {f x E S T U V B} →
+  function : ∀ {f x T U V B} →
 
-    (x ↦ S) ⊢ᴮ B ∈ E →
     (x ↦ T) ⊢ᴮ B ∈ V →
     ----------------------------------------------
-    ⊢ᴼ (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end)
+    ⊢ᴼ (just function f ⟨ var x ∈ T ⟩∈ U is B end)
+
+
+  checked : ∀ {f x S T U V W B} →
+
+    (x ↦ T) ⊢ᴮ B ∈ V →
+    (x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ W →
+    ----------------------------------------------
+    ⊢ᴼ (just function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end)
+
 
 ⊢ᴴ_ : Heap yes → Set
 ⊢ᴴ H = ∀ a {O} → (H [ a ]ᴴ ≡ O) → (⊢ᴼ O)

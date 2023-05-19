@@ -11,7 +11,7 @@ open import Properties.Contradiction using (CONTRADICTION)
 open import Properties.DecSubtyping using (dec-subtyping; dec-subtypingⁿ; <:-impl-<:ᵒ)
 open import Properties.Functions using (_∘_)
 open import Properties.Subtyping using (<:-refl; <:-trans; <:-trans-≮:; ≮:-trans-<:; <:-∩-left; <:-∩-right; <:-∩-glb; <:-impl-¬≮:; <:-function; function-≮:-never; <:-never; scalar-≮:-function; ≮:-∪-right; scalar-≮:-never; <:-∪-left; <:-∪-right)
-open import Properties.TypeNormalization using (Normal; FunType; normal; _⇒_; _∩_; _∪_; never; <:-normalize; normalize-<:; fun-≮:-never; scalar-≮:-fun)
+open import Properties.TypeNormalization using (Normal; FunType; normal; _⇒_; _∩_; _∪_; any; check; never; <:-normalize; normalize-<:; fun-≮:-never; scalar-≮:-fun)
 open import Properties.TypeSaturation using (Overloads; Saturated; _⊆ᵒ_; _<:ᵒ_; normal-saturate; saturated; <:-saturate; saturate-<:; defn; here; left; right)
 
 -- The domain of a normalized type
@@ -89,8 +89,7 @@ resolveᶠ : ∀ {F} → FunType F → Type → Type
 resolveᶠ Fᶠ V = resolveˢ (normal-saturate Fᶠ) (saturated Fᶠ) V
 
 resolveⁿ : ∀ {F} → Normal F → Type → Type
-resolveⁿ (S ⇒ T) V = resolveᶠ (S ⇒ T) V
-resolveⁿ (Fᶠ ∩ Gᶠ) V = resolveᶠ (Fᶠ ∩ Gᶠ) V
+resolveⁿ (Fᶠ ∩ T) V = resolveᶠ Fᶠ V
 resolveⁿ (Sⁿ ∪ Tˢ) V = any
 resolveⁿ never V = never
 

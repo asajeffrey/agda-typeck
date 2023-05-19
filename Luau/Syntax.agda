@@ -6,7 +6,7 @@ open import Agda.Builtin.Float using (Float)
 open import Agda.Builtin.String using (String)
 open import Luau.Var using (Var)
 open import Luau.Addr using (Addr)
-open import Luau.Type using (Type; never; any)
+open import Luau.Type using (Type; Test; never; any)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
 
 infixr 5 _∙_
@@ -25,17 +25,17 @@ name (var x ∈ T) = x
 
 data FunDec : Annotated → Set where
   _⟨_⟩ : Var → VarDec maybe → FunDec maybe
-  _⟨_∋_⟩∈_ : ∀ {a} → Var → Type → VarDec a → Type → FunDec a
-
-_⟨_⟩∈_ : ∀ {a} → Var → VarDec a → Type → FunDec a
-f ⟨ x ⟩∈ T = f ⟨ any ∋ x ⟩∈ T
+  _⟨_⟩∈_ : ∀ {a} → Var → VarDec a → Type → FunDec a
+  _⟨_∋_⟩∈_ : ∀ {a} → Var → Test → VarDec a → Type → FunDec a
 
 fun : ∀ {a} → FunDec a → VarDec a
 fun (f ⟨ x ⟩) = (var f)
+fun (f ⟨ x ⟩∈ T) = (var f ∈ T)
 fun (f ⟨ S ∋ x ⟩∈ T) = (var f ∈ T)
 
 arg : ∀ {a} → FunDec a → VarDec a
 arg (f ⟨ x ⟩) = x
+arg (f ⟨ x ⟩∈ T) = x
 arg (f ⟨ S ∋ x ⟩∈ T) = x
 
 data BinaryOperator : Set where

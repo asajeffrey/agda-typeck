@@ -7,14 +7,14 @@ open import Agda.Builtin.Unit using (⊤)
 open import FFI.Data.Either using (Either; Left; Right; mapL; mapR; mapLR; swapLR; cond)
 open import FFI.Data.Maybe using (just; nothing)
 open import Luau.Syntax using (Expr; Stat; Block; BinaryOperator; yes; nil; addr; var; binexp; var_∈_; _⟨_⟩∈_; function_is_end; _$_; block_is_end; local_←_; _∙_; done; return; name; +; -; *; /; <; >; <=; >=; ··)
-open import Luau.Type using (Type; unknown; never; any; error; funktion; scalar; _⇒_; _∪_; _∩_)
+open import Luau.Type using (Type; unknown; never; any; error; funktion; scalar; check; _⇒_; _∪_; _∩_; ⌊_⌋)
 open import Luau.ResolveOverloads using (src; resolve)
 open import Luau.SafeTypes using (Safe; Unsafe)
 open import Luau.Subtyping using (_<:_; _≮:_)
 open import Luau.ErrorSuppression using (_≮:ᵘ_)
 open import Luau.Heap using (Heap; function_is_end) renaming (_[_] to _[_]ᴴ)
 open import Luau.VarCtxt using (VarCtxt; ∅; _⋒_; _↦_; _⊕_↦_; _⊝_) renaming (_[_] to _[_]ⱽ)
-open import Luau.TypeCheck using (_⊢ᴮ_∈_; _⊢ᴱ_∈_; ⊢ᴴ_; ⊢ᴼ_; _⊢ᴴᴱ_▷_∈_; _⊢ᴴᴮ_▷_∈_; var; addr; app; binexp; block; return; local; function; srcBinOp)
+open import Luau.TypeCheck using (_⊢ᴮ_∈_; _⊢ᴱ_∈_; ⊢ᴴ_; ⊢ᴼ_; _⊢ᴴᴱ_▷_∈_; _⊢ᴴᴮ_▷_∈_; var; addr; app; binexp; block; return; local; function; checked; srcBinOp)
 open import Properties.Contradiction using (¬)
 open import Properties.TypeCheck using (typeCheckᴮ)
 open import Properties.Product using (_,_)
@@ -85,23 +85,35 @@ data Warningᴱ H {Γ} where
     ------------------------------
     Warningᴱ H (binexp {op} D₁ D₂)
     
-  FunctionDefnMismatch : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
+  FunctionDefnMismatch : ∀ {f x B T U V} {D : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
 
     (V ≮:ᵘ U) →
     -------------------------
-    Warningᴱ H (function {f} {U = U} D₁ D₂)
+    Warningᴱ H (function {f} {U = U} D)
 
-  FunctionErrorMismatch : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
+  CheckedDefnMismatch : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} → {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ E} →
+
+    (V ≮:ᵘ U) →
+    -------------------------
+    Warningᴱ H (checked {f} {U = U} D₁ D₂)
+
+  CheckedErrorMismatch : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} → {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ E} →
 
     (E ≮: error) →
     -------------------------
-    Warningᴱ H (function {f} {U = U} D₁ D₂)
+    Warningᴱ H (checked {f} {U = U} D₁ D₂)
 
-  function₁ : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
+  function₁ : ∀ {f x B T U V} {D : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
 
-    Warningᴮ H D₂ →
+    Warningᴮ H D →
     -------------------------
-    Warningᴱ H (function {f} {U = U} D₁ D₂)
+    Warningᴱ H (function {f} {U = U} D)
+
+  checked₁ : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ E} →
+
+    Warningᴮ H D₁ →
+    -------------------------
+    Warningᴱ H (checked {f} {U = U} D₁ D₂)
 
   BlockMismatch : ∀ {b B T U} {D : Γ ⊢ᴮ B ∈ U} →
 
@@ -121,11 +133,17 @@ data Warningᴱ H {Γ} where
     ------------------------------
     Warningᴱ H (block {b} {T = T} D)
 
-  UnsafeFunction : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
+  UnsafeFunction : ∀ {f x B T U V} {D : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
 
     Unsafe (T ⇒ U) →
     -------------------------
-    Warningᴱ H (function {f} {T = T} {U = U} D₁ D₂)
+    Warningᴱ H (function {f} {T = T} {U = U} D)
+
+  UnsafeChecked : ∀ {f x B E S T U V} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ B ∈ E} →
+
+    Unsafe (T ⇒ U) →
+    -------------------------
+    Warningᴱ H (checked {f} {T = T} {U = U} D₁ D₂)
 
 data Warningᴮ H {Γ} where
 
@@ -153,29 +171,35 @@ data Warningᴮ H {Γ} where
     --------------------
     Warningᴮ H (local D₁ D₂)
 
-  FunctionDefnMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₃ : (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W} →
+  FunctionDefnMismatch : ∀ {f x B C T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W} →
 
     (V ≮:ᵘ U) →
     -------------------------
-    Warningᴮ H (function D₁ D₂ D₃)
+    Warningᴮ H (function D₁ D₂)
 
-  FunctionErrorMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₃ : (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W} →
+  CheckedDefnMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
+
+    (V ≮:ᵘ U) →
+    -------------------------
+    Warningᴮ H (checked D₁ D₂ D₃)
+
+  CheckedErrorMismatch : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ x ↦ ⌊ S ⌋) ⊢ᴮ C ∈ E} {D₃ : (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) ⊢ᴮ B ∈ W} →
 
     (E ≮: error) →
     -------------------------
-    Warningᴮ H (function D₁ D₂ D₃)
+    Warningᴮ H (checked D₁ D₂ D₃)
 
-  function₁ : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₃ : (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W} →
+  function₁ : ∀ {f x B C T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W} →
+
+    Warningᴮ H D₁ →
+    --------------------
+    Warningᴮ H (function D₁ D₂)
+
+  function₂ : ∀ {f x B C T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W} →
 
     Warningᴮ H D₂ →
     --------------------
-    Warningᴮ H (function D₁ D₂ D₃)
-
-  function₂ : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₃ : (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W} →
-
-    Warningᴮ H D₃ →
-    --------------------
-    Warningᴮ H (function D₁ D₂ D₃)
+    Warningᴮ H (function D₁ D₂)
 
   UnsafeLocal : ∀ {x M B T U V} {D₁ : Γ ⊢ᴱ M ∈ U} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ B ∈ V} →
 
@@ -183,37 +207,37 @@ data Warningᴮ H {Γ} where
     --------------------
     Warningᴮ H (local D₁ D₂)
 
-  UnsafeFunction : ∀ {f x B C E S T U V W} {D₁ : (Γ ⊕ x ↦ S) ⊢ᴮ C ∈ E} {D₂ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₃ : (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) ⊢ᴮ B ∈ W} →
+  UnsafeFunction : ∀ {f x B C T U V W} {D₁ : (Γ ⊕ x ↦ T) ⊢ᴮ C ∈ V} {D₂ : (Γ ⊕ f ↦ (T ⇒ U)) ⊢ᴮ B ∈ W} →
 
     Unsafe (T ⇒ U) →
     --------------------
-    Warningᴮ H (function D₁ D₂ D₃)
+    Warningᴮ H (function D₁ D₂)
     
 data Warningᴼ (H : Heap yes) : ∀ {V} → (⊢ᴼ V) → Set where
 
-  FunctionDefnMismatch : ∀ {f x B E S T U V} {D₁ : (x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (x ↦ T) ⊢ᴮ B ∈ V} →
+  FunctionDefnMismatch : ∀ {f x B T U V} {D : (x ↦ T) ⊢ᴮ B ∈ V} →
 
     (V ≮: U) →
     ---------------------------------
-    Warningᴼ H (function {f} {U = U} D₁ D₂)
+    Warningᴼ H (function {f} {U = U} D)
 
-  FunctionErrorMismatch : ∀ {f x B E S T U V} {D₁ : (x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (x ↦ T) ⊢ᴮ B ∈ V} →
+  FunctionErrorMismatch : ∀ {f x B E T U V} {D : (x ↦ T) ⊢ᴮ B ∈ V} →
 
     (E ≮: error) →
     ---------------------------------
-    Warningᴼ H (function {f} {U = U} D₁ D₂)
+    Warningᴼ H (function {f} {U = U} D)
 
-  function₁ : ∀ {f x B E S T U V} {D₁ : (x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (x ↦ T) ⊢ᴮ B ∈ V} →
+  function₁ : ∀ {f x B T U V} {D : (x ↦ T) ⊢ᴮ B ∈ V} →
 
-    Warningᴮ H D₂ →
+    Warningᴮ H D →
     ---------------------------------
-    Warningᴼ H (function {f} {U = U} D₁ D₂)
+    Warningᴼ H (function {f} {U = U} D)
 
-  UnsafeFunction : ∀ {f x B E S T U V} {D₁ : (x ↦ S) ⊢ᴮ B ∈ E} {D₂ : (x ↦ T) ⊢ᴮ B ∈ V} →
+  UnsafeFunction : ∀ {f x B T U V} {D : (x ↦ T) ⊢ᴮ B ∈ V} →
 
     Unsafe (T ⇒ U) →
     ---------------------------------
-    Warningᴼ H (function {f} {U = U} D₁ D₂)
+    Warningᴼ H (function {f} {U = U} D)
 
 data Warningᴴ H (D : ⊢ᴴ H) : Set where
 

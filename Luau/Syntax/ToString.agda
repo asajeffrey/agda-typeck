@@ -7,7 +7,7 @@ open import Luau.Syntax using (Value; Block; Stat; Expr; VarDec; FunDec; nil; bo
 open import Luau.Type using (never; any)
 open import FFI.Data.String using (String; _++_)
 open import Luau.Addr.ToString using (addrToString)
-open import Luau.Type.ToString using (typeToString)
+open import Luau.Type.ToString using (typeToString; testToString)
 open import Luau.Var.ToString using (varToString)
 
 varDecToString : ∀ {a} → VarDec a → String
@@ -15,12 +15,12 @@ varDecToString (var x) = varToString x
 varDecToString (var x ∈ T) =  varToString x ++ " : " ++ typeToString T
 
 funDecToString : ∀ {a} → FunDec a → String
-funDecToString ("" ⟨ any ∋ x ⟩∈ T) = "function(" ++ varDecToString x ++ "): " ++ typeToString T
-funDecToString ("" ⟨ S ∋ x ⟩∈ T) = "function(@checked(" ++ typeToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString ("" ⟨ x ⟩∈ T) = "function(" ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString ("" ⟨ S ∋ x ⟩∈ T) = "function(@checked(" ++ testToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
 funDecToString ("" ⟨ x ⟩) = "function(" ++ varDecToString x ++ ")"
 funDecToString (f ⟨ x ⟩) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ ")"
-funDecToString (f ⟨ any ∋ x ⟩∈ T) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ "): " ++ typeToString T
-funDecToString (f ⟨ S ∋ x ⟩∈ T) = "function " ++ varToString f ++ "( @checked(" ++ typeToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString (f ⟨ x ⟩∈ T) = "function " ++ varToString f ++ "(" ++ varDecToString x ++ "): " ++ typeToString T
+funDecToString (f ⟨ S ∋ x ⟩∈ T) = "function " ++ varToString f ++ "( @checked(" ++ testToString(S) ++ ") " ++ varDecToString x ++ "): " ++ typeToString T
 
 binOpToString : BinaryOperator → String
 binOpToString + = "+"

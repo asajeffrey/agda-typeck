@@ -7,9 +7,9 @@ open import Agda.Builtin.Bool using (Bool; true; false)
 open import FFI.Data.Maybe using (Maybe; just; nothing)
 open import FFI.Data.Either using (Either)
 open import Luau.ResolveOverloads using (resolve)
-open import Luau.TypeCheck using (_⊢ᴱ_∈_; _⊢ᴮ_∈_; ⊢ᴼ_; ⊢ᴴ_; _⊢ᴴᴱ_▷_∈_; _⊢ᴴᴮ_▷_∈_; nil; var; addr; num; bool; str; app; function; block; binexp; done; return; local; nothing; orAny; tgtBinOp)
-open import Luau.Syntax using (Block; Expr; Value; BinaryOperator; yes; nil; addr; num; bool; str; val; var; binexp; _$_; function_is_end; block_is_end; _∙_; return; done; local_←_; _⟨_⟩; _⟨_⟩∈_; _⟨_∌_⟩∈_; var_∈_; name; fun; arg; +; -; *; /; <; >; ==; ~=; <=; >=)
-open import Luau.Type using (Type; nill; any; never; number; boolean; string; error; _⇒_; _∩_)
+open import Luau.TypeCheck using (_⊢ᴱ_∈_; _⊢ᴮ_∈_; ⊢ᴼ_; ⊢ᴴ_; _⊢ᴴᴱ_▷_∈_; _⊢ᴴᴮ_▷_∈_; nil; var; addr; num; bool; str; app; function; checked; block; binexp; done; return; local; nothing; orAny; tgtBinOp)
+open import Luau.Syntax using (Block; Expr; Value; BinaryOperator; yes; nil; addr; num; bool; str; val; var; binexp; _$_; function_is_end; block_is_end; _∙_; return; done; local_←_; _⟨_⟩; _⟨_⟩∈_; _⟨_∋_⟩∈_; var_∈_; name; fun; arg; +; -; *; /; <; >; ==; ~=; <=; >=)
+open import Luau.Type using (Type; nill; any; never; number; boolean; string; error; check; _⇒_; _∩_; ⌊_⌋)
 open import Luau.RuntimeType using (RuntimeType; nil; num; function; str; valueType)
 open import Luau.VarCtxt using (VarCtxt; ∅; _↦_; _⊕_↦_; _⋒_; _⊝_) renaming (_[_] to _[_]ⱽ)
 open import Luau.Addr using (Addr)
@@ -22,7 +22,8 @@ open import Properties.Product using (_×_; _,_)
 open import Properties.Remember using (Remember; remember; _,_)
 
 typeOfᴼ : Object yes → Type
-typeOfᴼ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) = (S ⇒ error) ∩ (T ⇒ U)
+typeOfᴼ (function f ⟨ var x ∈ T ⟩∈ U is B end) = (T ⇒ U)
+typeOfᴼ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end) = (T ⇒ U) ∩ check S
 
 typeOfᴹᴼ : Maybe(Object yes) → Maybe Type
 typeOfᴹᴼ nothing = nothing
@@ -41,11 +42,13 @@ typeOfᴮ : Heap yes → VarCtxt → (Block yes) → Type
 typeOfᴱ H Γ (var x) = orAny(Γ [ x ]ⱽ)
 typeOfᴱ H Γ (val v) = orAny(typeOfⱽ H v)
 typeOfᴱ H Γ (M $ N) = resolve (typeOfᴱ H Γ M) (typeOfᴱ H Γ N)
-typeOfᴱ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) = (S ⇒ error) ∩ (T ⇒ U)
+typeOfᴱ H Γ (function f ⟨ var x ∈ T ⟩∈ U is B end) = (T ⇒ U)
+typeOfᴱ H Γ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end) = (T ⇒ U) ∩ check S
 typeOfᴱ H Γ (block var b ∈ T is B end) = T
 typeOfᴱ H Γ (binexp M op N) = tgtBinOp op
 
-typeOfᴮ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) = typeOfᴮ H (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) B
+typeOfᴮ H Γ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) = typeOfᴮ H (Γ ⊕ f ↦ (T ⇒ U)) B
+typeOfᴮ H Γ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is C end ∙ B) = typeOfᴮ H (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) B
 typeOfᴮ H Γ (local var x ∈ T ← M ∙ B) = typeOfᴮ H (Γ ⊕ x ↦ T) B
 typeOfᴮ H Γ (return M ∙ B) = typeOfᴱ H Γ M
 typeOfᴮ H Γ done = nill
@@ -53,7 +56,8 @@ typeOfᴮ H Γ done = nill
 mustBeNumber : ∀ H Γ v → (typeOfᴱ H Γ (val v) ≡ number) → (valueType(v) ≡ num)
 mustBeNumber H Γ (addr a) p with remember (H [ a ]ᴴ)
 mustBeNumber H Γ (addr a) p | (just O , q) with trans (cong orAny (cong typeOfᴹᴼ (sym q))) p
-mustBeNumber H Γ (addr a) p | (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end , q) | ()
+mustBeNumber H Γ (addr a) p | (just function f ⟨ var x ∈ T ⟩∈ U is B end , q) | ()
+mustBeNumber H Γ (addr a) p | (just function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end , q) | ()
 mustBeNumber H Γ (addr a) p | (nothing , q) with trans (cong orAny (cong typeOfᴹᴼ (sym q))) p
 mustBeNumber H Γ (addr a) p | nothing , q | ()
 mustBeNumber H Γ (num n) p = refl
@@ -61,7 +65,8 @@ mustBeNumber H Γ (num n) p = refl
 mustBeString : ∀ H Γ v → (typeOfᴱ H Γ (val v) ≡ string) → (valueType(v) ≡ str)
 mustBeString H Γ (addr a) p with remember (H [ a ]ᴴ)
 mustBeString H Γ (addr a) p | (just O , q) with trans (cong orAny (cong typeOfᴹᴼ (sym q))) p
-mustBeString H Γ (addr a) p | (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end , q) | ()
+mustBeString H Γ (addr a) p | (just function f ⟨ var x ∈ T ⟩∈ U is B end , q) | ()
+mustBeString H Γ (addr a) p | (just function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end , q) | ()
 mustBeString H Γ (addr a) p | (nothing , q) with trans (cong orAny (cong typeOfᴹᴼ (sym q))) p
 mustBeString H Γ (addr a) p | (nothing , q) | ()
 mustBeString H Γ (str x) p = refl
@@ -76,18 +81,21 @@ typeCheckᴱ H Γ (val (num n)) = num
 typeCheckᴱ H Γ (val (bool b)) = bool
 typeCheckᴱ H Γ (val (str x)) = str
 typeCheckᴱ H Γ (M $ N) = app (typeCheckᴱ H Γ M) (typeCheckᴱ H Γ N)
-typeCheckᴱ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) = function (typeCheckᴮ H (Γ ⊕ x ↦ S) B) (typeCheckᴮ H (Γ ⊕ x ↦ T) B)
+typeCheckᴱ H Γ (function f ⟨ var x ∈ T ⟩∈ U is B end) = function (typeCheckᴮ H (Γ ⊕ x ↦ T) B)
+typeCheckᴱ H Γ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end) = checked (typeCheckᴮ H (Γ ⊕ x ↦ T) B) (typeCheckᴮ H (Γ ⊕ x ↦ ⌊ S ⌋) B)
 typeCheckᴱ H Γ (block var b ∈ T is B end) = block (typeCheckᴮ H Γ B)
 typeCheckᴱ H Γ (binexp M op N) = binexp (typeCheckᴱ H Γ M) (typeCheckᴱ H Γ N)
 
-typeCheckᴮ H Γ (function f ⟨ S ∌ var x ∈ T ⟩∈ U is C end ∙ B) = function (typeCheckᴮ H (Γ ⊕ x ↦ S) C) (typeCheckᴮ H (Γ ⊕ x ↦ T) C) (typeCheckᴮ H (Γ ⊕ f ↦ ((S ⇒ error) ∩ (T ⇒ U))) B)
+typeCheckᴮ H Γ (function f ⟨ var x ∈ T ⟩∈ U is C end ∙ B) = function (typeCheckᴮ H (Γ ⊕ x ↦ T) C) (typeCheckᴮ H (Γ ⊕ f ↦ (T ⇒ U)) B)
+typeCheckᴮ H Γ (function f ⟨ S ∋ var x ∈ T ⟩∈ U is C end ∙ B) = checked (typeCheckᴮ H (Γ ⊕ x ↦ T) C) (typeCheckᴮ H (Γ ⊕ x ↦ ⌊ S ⌋) C) (typeCheckᴮ H (Γ ⊕ f ↦ ((T ⇒ U) ∩ check S)) B)
 typeCheckᴮ H Γ (local var x ∈ T ← M ∙ B) = local (typeCheckᴱ H Γ M) (typeCheckᴮ H (Γ ⊕ x ↦ T) B)
 typeCheckᴮ H Γ (return M ∙ B) = return (typeCheckᴱ H Γ M) (typeCheckᴮ H Γ B)
 typeCheckᴮ H Γ done = done
 
 typeCheckᴼ : ∀ H O → (⊢ᴼ O)
 typeCheckᴼ H nothing = nothing
-typeCheckᴼ H (just function f ⟨ S ∌ var x ∈ T ⟩∈ U is B end) = function (typeCheckᴮ H (x ↦ S) B) (typeCheckᴮ H (x ↦ T) B)
+typeCheckᴼ H (just function f ⟨ var x ∈ T ⟩∈ U is B end) = function (typeCheckᴮ H (x ↦ T) B)
+typeCheckᴼ H (just function f ⟨ S ∋ var x ∈ T ⟩∈ U is B end) = checked (typeCheckᴮ H (x ↦ T) B) (typeCheckᴮ H (x ↦ ⌊ S ⌋) B)
 
 typeCheckᴴ : ∀ H → (⊢ᴴ H)
 typeCheckᴴ H a {O} p = typeCheckᴼ H (O)
